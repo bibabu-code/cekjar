@@ -1,0 +1,1790 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Net-T93 Network Manager v.1.1.0</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        navy: '#2F3185',
+                        gold: '#FFB800',
+                        teal: '#1CBDB3'
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #f3f4f6; }
+        /* Touch target optimizations */
+        button, select, input { min-height: 44px; }
+        .drawer-transition { transition: transform 0.3s ease-in-out; }
+        .modal-transition { transition: opacity 0.2s ease-in-out; }
+        /* Custom scrollbar for mobile sleekness */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-thumb { background: #1CBDB3; border-radius: 4px; }
+        
+        /* Android Material 3 Styles */
+        .android-ripple:active { background-color: rgba(0,0,0,0.1); }
+        .nav-pill { transition: all 0.2s ease; border-radius: 9999px; padding: 4px 16px; }
+        .nav-active .nav-pill { background-color: #e0f2f1; /* teal-50 */ }
+    </style>
+</head>
+<body class="text-gray-800 antialiased h-screen flex flex-col overflow-hidden selection:bg-teal selection:text-white">
+
+    <!-- Fake Android Status Bar -->
+    <div class="bg-[#1a1c5b] text-white/90 text-[11px] flex justify-between px-4 py-1.5 items-center font-medium z-40 shrink-0">
+        <div id="androidClock">10:00</div>
+        <div class="flex items-center gap-1.5 text-[10px]">
+            <i class="fas fa-signal"></i>
+            <i class="fas fa-wifi"></i>
+            <i class="fas fa-battery-full text-[12px]"></i>
+        </div>
+    </div>
+
+    <!-- Navbar / Sticky Header -->
+    <header class="bg-navy text-white shadow-md z-30 sticky top-0 shrink-0">
+        <div class="flex items-center justify-between px-2 py-2">
+            <div class="flex items-center gap-1">
+                <button id="btnOpenMenu" onclick="openMenu()" class="text-white hover:bg-white/10 android-ripple rounded-full p-2 touch-target flex items-center justify-center transition-colors w-12 h-12">
+                    <i class="fas fa-bars text-lg"></i>
+                </button>
+                <div class="ml-1">
+                    <h1 class="text-lg font-bold tracking-wider leading-none">Net-<span class="text-gold">T93</span></h1>
+                    <span class="text-[10px] text-teal font-medium tracking-widest uppercase">IPAM & Troubleshooter</span>
+                </div>
+            </div>
+            <div class="px-3">
+                <div class="bg-white/10 rounded-full flex items-center px-3 py-1.5 border border-white/20">
+                    <i class="fas fa-search text-gray-300 text-sm"></i>
+                    <input type="text" id="searchInput" placeholder="Cari IP/Nama..." class="bg-transparent border-none focus:outline-none text-white placeholder-gray-300 ml-2 w-28 md:w-48 text-sm h-auto min-h-0 py-1">
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="flex-1 overflow-y-auto pb-24 relative scroll-smooth" id="mainScrollArea">
+        
+        <!-- Tab 1: Daftar IP -->
+        <div id="tabList" class="p-4 w-full max-w-3xl mx-auto space-y-4">
+            <!-- Stats Cards -->
+            <div class="grid grid-cols-2 gap-3 mb-2">
+                <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-3 flex items-center gap-3">
+                    <div class="bg-teal/10 text-teal rounded-lg p-2.5 w-10 h-10 flex items-center justify-center">
+                        <i class="fas fa-network-wired text-lg"></i>
+                    </div>
+                    <div>
+                        <p class="text-xs text-gray-500 font-medium">Total Perangkat</p>
+                        <p class="text-lg font-bold text-navy" id="statTotalIP">0</p>
+                    </div>
+                </div>
+                <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-3 flex items-center gap-3">
+                    <div class="bg-gold/10 text-gold rounded-lg p-2.5 w-10 h-10 flex items-center justify-center">
+                        <i class="fas fa-wifi text-lg"></i>
+                    </div>
+                    <div>
+                        <p class="text-xs text-gray-500 font-medium">Access Point</p>
+                        <p class="text-lg font-bold text-navy" id="statTotalAP">0</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- List Container -->
+            <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                <div id="ipListContainer" class="divide-y divide-gray-50">
+                    <!-- Device items will be injected here via JS -->
+                </div>
+                <!-- Empty State -->
+                <div id="emptyState" class="hidden flex-col items-center justify-center p-8 text-center">
+                    <div class="bg-gray-50 rounded-full p-4 mb-3">
+                        <i class="fas fa-box-open text-3xl text-gray-300"></i>
+                    </div>
+                    <p class="text-gray-500 font-medium">Belum ada perangkat.</p>
+                    <p class="text-gray-400 text-sm mt-1">Tekan tombol + untuk menambahkan IP.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab 2: Alat Jaringan (Diagnostics) -->
+        <div id="tabDiagnostics" class="hidden p-4 w-full max-w-3xl mx-auto flex flex-col h-full gap-4">
+            <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+                <div class="flex justify-between items-center mb-3">
+                    <h2 class="text-lg font-bold text-navy"><i class="fas fa-tools mr-2 text-teal"></i>Alat Diagnostik</h2>
+                    <button onclick="switchTab('guide')" class="text-xs text-teal hover:underline font-medium flex items-center gap-1 min-h-0 py-1 px-2 rounded-lg bg-teal/10">
+                        <i class="fas fa-question-circle"></i> Kamus Alat
+                    </button>
+                </div>
+
+                <!-- OS Selector Toggle -->
+                <div class="mb-3 bg-gray-100 p-1 rounded-xl flex items-center">
+                    <button type="button" id="btnOsWin" onclick="setOS('windows')" class="flex-1 py-1.5 px-3 rounded-lg text-xs font-bold transition-all bg-white text-navy shadow-sm flex items-center justify-center gap-1.5 min-h-[34px]">
+                        <i class="fab fa-windows text-blue-600 text-sm"></i> Windows
+                    </button>
+                    <button type="button" id="btnOsUnix" onclick="setOS('unix')" class="flex-1 py-1.5 px-3 rounded-lg text-xs font-bold transition-all text-gray-500 hover:text-navy flex items-center justify-center gap-1.5 min-h-[34px]">
+                        <i class="fab fa-linux text-gray-800 text-sm"></i> <i class="fab fa-apple text-gray-800 text-sm"></i> Linux / iOS
+                    </button>
+                </div>
+                
+                <!-- Tool Selection -->
+                <div class="mb-3">
+                    <label class="block text-xs font-semibold text-gray-500 mb-1">Pilih Alat</label>
+                    <select id="toolSelect" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:border-teal focus:ring-1 focus:ring-teal bg-white" onchange="updateAttributes()">
+                        <option value="ping">Ping (ICMP Echo)</option>
+                        <option value="arp">ARP (Address Resolution)</option>
+                        <option value="tracert">Tracert / Traceroute (Jalur Rute)</option>
+                        <option value="nmap">Nmap (Port Scanner)</option>
+                        <option value="nslookup">Nslookup (DNS Query)</option>
+                        <option value="ipconfig">Ipconfig / Ifconfig (Info IP Lokal)</option>
+                        <option value="netstat">Netstat / SS (Koneksi Aktif)</option>
+                        <option value="curl">cURL (HTTP Header Check)</option>
+                    </select>
+                </div>
+
+                <!-- Attributes Checkboxes -->
+                <div class="mb-3" id="attrContainer">
+                    <label class="block text-xs font-semibold text-gray-500 mb-1">Opsi Atribut</label>
+                    <div class="flex flex-wrap gap-2" id="attrOptions">
+                        <!-- Checkboxes injected by JS based on selection -->
+                    </div>
+                </div>
+
+                <!-- Command Input -->
+                <div class="mb-4">
+                    <label class="block text-xs font-semibold text-gray-500 mb-1">Target / Perintah (Dapat diedit)</label>
+                    <div class="flex gap-2">
+                        <input type="text" id="diagInput" class="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:border-teal focus:ring-1 focus:ring-teal font-mono" placeholder="Masukkan IP target...">
+                    </div>
+                </div>
+
+                <button onclick="runDiagnostic()" class="w-full bg-navy hover:bg-blue-900 text-white font-medium py-2.5 rounded-lg transition-colors flex items-center justify-center gap-2 android-ripple">
+                    <i class="fas fa-play text-xs"></i> Jalankan Simulasi
+                </button>
+            </div>
+
+            <!-- Terminal Output -->
+            <div class="flex-1 bg-[#1e1e1e] rounded-xl shadow-inner border border-gray-800 p-3 overflow-hidden flex flex-col min-h-[220px]">
+                <div class="flex justify-between items-center mb-2 border-b border-gray-700 pb-2">
+                    <span class="text-xs text-gray-400 font-mono flex items-center gap-2">
+                        <span class="w-2.5 h-2.5 rounded-full bg-red-500"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-yellow-500"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-green-500"></span>
+                        Terminal Output
+                    </span>
+                    <div class="flex items-center gap-1.5">
+                        <button onclick="copyTerminalOutput()" id="btnCopyTerm" class="text-gray-300 hover:text-white text-[11px] px-2.5 py-1 rounded bg-white/10 hover:bg-white/20 transition-colors min-h-0 flex items-center gap-1">
+                            <i class="fas fa-copy"></i> Salin
+                        </button>
+                        <button onclick="askAIAboutOutput()" class="text-navy font-semibold text-[11px] px-2.5 py-1 rounded bg-gold hover:bg-yellow-400 transition-colors min-h-0 flex items-center gap-1">
+                            <i class="fas fa-sparkles"></i> Analisis AI
+                        </button>
+                        <button onclick="clearTerminal()" class="text-gray-400 hover:text-white text-[11px] px-2 py-1 rounded bg-white/5 transition-colors min-h-0">Clear</button>
+                    </div>
+                </div>
+                <div id="terminalOutput" class="flex-1 overflow-y-auto text-green-400 font-mono text-[11px] leading-relaxed break-all whitespace-pre-wrap"></div>
+            </div>
+
+            <!-- Penjelasan Output Mudah Dipahami (Smart Human-Readable Summary) -->
+            <div id="easySummaryCard" class="hidden bg-white rounded-xl shadow-sm border border-teal/40 p-4 transition-all">
+                <div class="flex items-center justify-between mb-2">
+                    <div class="flex items-center gap-2">
+                        <div class="w-7 h-7 rounded-lg bg-teal/15 text-teal flex items-center justify-center">
+                            <i class="fas fa-lightbulb text-sm"></i>
+                        </div>
+                        <h3 class="text-xs font-bold text-navy uppercase tracking-wider">Terjemahan Output (Mudah Dipahami)</h3>
+                    </div>
+                    <span id="summaryStatusBadge" class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-green-100 text-green-700 border border-green-200">Normal</span>
+                </div>
+                <div id="easySummaryContent" class="text-xs text-gray-700 space-y-1.5 leading-relaxed bg-teal/5 p-3 rounded-lg border border-teal/10">
+                    <!-- Ringkasan otomatis akan muncul di sini -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab 3: Troubleshooting (SOP Lapangan) -->
+        <div id="tabTrouble" class="hidden p-4 w-full max-w-3xl mx-auto space-y-4">
+            <!-- Header Banner -->
+            <div class="bg-gradient-to-r from-navy to-blue-900 text-white p-4 rounded-xl shadow-sm flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <div class="bg-gold/20 p-3 rounded-xl text-gold border border-gold/30">
+                        <i class="fas fa-stethoscope text-xl"></i>
+                    </div>
+                    <div>
+                        <h2 class="text-base font-bold">Pusat Troubleshooting Net-T93</h2>
+                        <p class="text-xs text-gray-200 mt-0.5">SOP langkah demi langkah penanganan masalah jaringan kantor.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- OS Selector for Troubleshooting -->
+            <div class="bg-white p-3 rounded-xl shadow-sm border border-gray-100 flex items-center justify-between">
+                <span class="text-xs font-bold text-gray-600"><i class="fas fa-laptop-code mr-1.5 text-teal"></i>Mode Perintah OS:</span>
+                <div class="bg-gray-100 p-1 rounded-lg flex items-center w-56">
+                    <button type="button" id="btnTroubleOsWin" onclick="setOS('windows')" class="flex-1 py-1 px-2 rounded-md text-[11px] font-bold transition-all bg-white text-navy shadow-sm flex items-center justify-center gap-1 min-h-[28px]">
+                        <i class="fab fa-windows text-blue-600"></i> Windows
+                    </button>
+                    <button type="button" id="btnTroubleOsUnix" onclick="setOS('unix')" class="flex-1 py-1 px-2 rounded-md text-[11px] font-bold transition-all text-gray-500 hover:text-navy flex items-center justify-center gap-1 min-h-[28px]">
+                        <i class="fab fa-linux"></i>/<i class="fab fa-apple"></i> Linux/iOS
+                    </button>
+                </div>
+            </div>
+
+            <!-- Filter Skenario -->
+            <div class="flex gap-2 overflow-x-auto pb-1 text-xs">
+                <button onclick="filterTrouble('all')" class="trouble-filter bg-navy text-white px-3 py-1.5 rounded-full font-medium shrink-0 min-h-0">Semua Kasus</button>
+                <button onclick="filterTrouble('cas')" class="trouble-filter bg-white text-gray-600 border border-gray-200 px-3 py-1.5 rounded-full font-medium shrink-0 min-h-0">Gagal Login Portal</button>
+                <button onclick="filterTrouble('wifi')" class="trouble-filter bg-white text-gray-600 border border-gray-200 px-3 py-1.5 rounded-full font-medium shrink-0 min-h-0">Wi-Fi Lambat/Putus</button>
+                <button onclick="filterTrouble('conflict')" class="trouble-filter bg-white text-gray-600 border border-gray-200 px-3 py-1.5 rounded-full font-medium shrink-0 min-h-0">IP Conflict</button>
+                <button onclick="filterTrouble('wan')" class="trouble-filter bg-white text-gray-600 border border-gray-200 px-3 py-1.5 rounded-full font-medium shrink-0 min-h-0">Internet Mati</button>
+            </div>
+
+            <!-- Container Kartu Troubleshooting (Injected via JS based on OS) -->
+            <div id="troubleCardsContainer" class="space-y-4"></div>
+        </div>
+
+        <!-- Tab 4: Panduan & Keterangan Alat (Guide) -->
+        <div id="tabGuide" class="hidden p-4 w-full max-w-3xl mx-auto space-y-4">
+            <div class="bg-navy text-white p-4 rounded-xl shadow-sm flex items-center gap-3">
+                <div class="bg-white/10 p-3 rounded-xl text-gold">
+                    <i class="fas fa-book-open text-xl"></i>
+                </div>
+                <div>
+                    <h2 class="text-base font-bold">Kamus Alat Diagnostik</h2>
+                    <p class="text-xs text-gray-200 mt-0.5">Penjelasan fungsi perintah dan parameter atributnya untuk pengelolaan jaringan kantor.</p>
+                </div>
+            </div>
+
+            <!-- Guide Cards -->
+            <div class="space-y-3">
+                <!-- 1. PING -->
+                <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+                    <div class="flex items-center justify-between border-b border-gray-100 pb-2 mb-2">
+                        <span class="font-bold text-navy text-sm flex items-center gap-2"><i class="fas fa-exchange-alt text-teal"></i> 1. PING (Packet Internet Groper)</span>
+                        <span class="text-[10px] font-mono bg-gray-100 px-2 py-0.5 rounded text-gray-600">Konektivitas</span>
+                    </div>
+                    <p class="text-xs text-gray-600 mb-3 leading-relaxed">Menguji apakah suatu perangkat (seperti Access Point, Switch, atau Server) sedang *online*/terhubung dan mengukur waktu responsnya (*latency* dalam milidetik).</p>
+                    <div class="bg-gray-50 p-2.5 rounded-lg space-y-1.5 border border-gray-100">
+                        <div class="text-[11px]"><code class="font-bold text-teal bg-teal/10 px-1.5 py-0.5 rounded">-t</code> (Win) : Ping terus-menerus tanpa henti (Di Linux/iOS otomatis terus-menerus tanpa atribut).</div>
+                        <div class="text-[11px]"><code class="font-bold text-teal bg-teal/10 px-1.5 py-0.5 rounded">-n 4</code> (Win) / <code class="font-bold text-teal bg-teal/10 px-1.5 py-0.5 rounded">-c 4</code> (Linux/iOS) : Membatasi jumlah paket uji sebanyak 4 kali.</div>
+                        <div class="text-[11px]"><code class="font-bold text-teal bg-teal/10 px-1.5 py-0.5 rounded">-l 32</code> (Win) / <code class="font-bold text-teal bg-teal/10 px-1.5 py-0.5 rounded">-s 32</code> (Linux/iOS) : Mengatur ukuran beban paket data sebesar 32 byte.</div>
+                    </div>
+                </div>
+
+                <!-- 2. ARP -->
+                <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+                    <div class="flex items-center justify-between border-b border-gray-100 pb-2 mb-2">
+                        <span class="font-bold text-navy text-sm flex items-center gap-2"><i class="fas fa-microchip text-teal"></i> 2. ARP (Address Resolution Protocol)</span>
+                        <span class="text-[10px] font-mono bg-gray-100 px-2 py-0.5 rounded text-gray-600">Pemetaan Fisik</span>
+                    </div>
+                    <p class="text-xs text-gray-600 mb-3 leading-relaxed">Menerjemahkan dan menampilkan daftar kecocokan antara alamat IP dengan alamat fisik perangkat (**MAC Address**) yang tersimpan di memori lokal.</p>
+                    <div class="bg-gray-50 p-2.5 rounded-lg space-y-1.5 border border-gray-100">
+                        <div class="text-[11px]"><code class="font-bold text-teal bg-teal/10 px-1.5 py-0.5 rounded">-a</code> : Menampilkan seluruh tabel pemetaan IP ke MAC Address yang aktif. Sangat berguna untuk melacak perangkat asing atau mencari tahu MAC Address Access Point.</div>
+                    </div>
+                </div>
+
+                <!-- 3. TRACERT -->
+                <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+                    <div class="flex items-center justify-between border-b border-gray-100 pb-2 mb-2">
+                        <span class="font-bold text-navy text-sm flex items-center gap-2"><i class="fas fa-route text-teal"></i> 3. TRACERT (Win) / TRACEROUTE (Linux/iOS)</span>
+                        <span class="text-[10px] font-mono bg-gray-100 px-2 py-0.5 rounded text-gray-600">Jalur Rute</span>
+                    </div>
+                    <p class="text-xs text-gray-600 mb-3 leading-relaxed">Melacak titik-titik lompatan (*hop* / router / switch Layer 3) mana saja yang dilewati oleh paket data untuk mencapai tujuan. Berguna mencari titik kemacetan jaringan (*bottleneck*).</p>
+                    <div class="bg-gray-50 p-2.5 rounded-lg space-y-1.5 border border-gray-100">
+                        <div class="text-[11px]"><code class="font-bold text-teal bg-teal/10 px-1.5 py-0.5 rounded">-d</code> (Win) / <code class="font-bold text-teal bg-teal/10 px-1.5 py-0.5 rounded">-n</code> (Linux/iOS) : Mempercepat pelacakan dengan tidak menerjemahkan IP ke nama domain.</div>
+                        <div class="text-[11px]"><code class="font-bold text-teal bg-teal/10 px-1.5 py-0.5 rounded">-h 30</code> (Win) / <code class="font-bold text-teal bg-teal/10 px-1.5 py-0.5 rounded">-m 30</code> (Linux/iOS) : Membatasi jumlah lompatan maksimal 30 router.</div>
+                    </div>
+                </div>
+
+                <!-- 4. NMAP -->
+                <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+                    <div class="flex items-center justify-between border-b border-gray-100 pb-2 mb-2">
+                        <span class="font-bold text-navy text-sm flex items-center gap-2"><i class="fas fa-radar text-teal"></i> 4. NMAP (Network Mapper)</span>
+                        <span class="text-[10px] font-mono bg-gray-100 px-2 py-0.5 rounded text-gray-600">Audit & Keamanan</span>
+                    </div>
+                    <p class="text-xs text-gray-600 mb-3 leading-relaxed">Memindai perangkat secara mendalam untuk melihat *port* layanan apa saja yang sedang terbuka (misal: port 80 untuk web, 22 untuk SSH) serta mengaudit keamanan server.</p>
+                    <div class="bg-gray-50 p-2.5 rounded-lg space-y-1.5 border border-gray-100">
+                        <div class="text-[11px]"><code class="font-bold text-teal bg-teal/10 px-1.5 py-0.5 rounded">-sV</code> : Mendeteksi versi aplikasi/layanan secara spesifik yang berjalan di balik port yang terbuka (misal: *Nginx 1.24*).</div>
+                        <div class="text-[11px]"><code class="font-bold text-teal bg-teal/10 px-1.5 py-0.5 rounded">-O</code> : Mendeteksi jenis Sistem Operasi (OS) dan vendor perangkat keras pada jaringan.</div>
+                        <div class="text-[11px]"><code class="font-bold text-teal bg-teal/10 px-1.5 py-0.5 rounded">-p 1-1000</code> : Memfokuskan pemindaian hanya pada rentang nomor port 1 hingga 1000.</div>
+                    </div>
+                </div>
+
+                <!-- 5. NSLOOKUP -->
+                <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+                    <div class="flex items-center justify-between border-b border-gray-100 pb-2 mb-2">
+                        <span class="font-bold text-navy text-sm flex items-center gap-2"><i class="fas fa-globe text-teal"></i> 5. NSLOOKUP (Name Server Lookup)</span>
+                        <span class="text-[10px] font-mono bg-gray-100 px-2 py-0.5 rounded text-gray-600">Diagnosa DNS</span>
+                    </div>
+                    <p class="text-xs text-gray-600 mb-3 leading-relaxed">Menguji server DNS lokal untuk memastikan nama domain internal (seperti halaman login `cas.kantor.lokal`) mengarah ke alamat IP server yang tepat.</p>
+                    <div class="bg-gray-50 p-2.5 rounded-lg space-y-1.5 border border-gray-100">
+                        <div class="text-[11px]"><code class="font-bold text-teal bg-teal/10 px-1.5 py-0.5 rounded">-type=A</code> : Mencari alamat IPv4 dari sebuah nama domain (*Address record*).</div>
+                        <div class="text-[11px]"><code class="font-bold text-teal bg-teal/10 px-1.5 py-0.5 rounded">-type=PTR</code> : Kebalikannya (*Reverse DNS*), mencari tahu apa nama domain dari sebuah alamat IP.</div>
+                    </div>
+                </div>
+
+                <!-- 6. IPCONFIG -->
+                <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+                    <div class="flex items-center justify-between border-b border-gray-100 pb-2 mb-2">
+                        <span class="font-bold text-navy text-sm flex items-center gap-2"><i class="fas fa-id-card text-teal"></i> 6. IPCONFIG (Win) / IFCONFIG & IP (Linux/iOS)</span>
+                        <span class="text-[10px] font-mono bg-gray-100 px-2 py-0.5 rounded text-gray-600">Info Lokal</span>
+                    </div>
+                    <p class="text-xs text-gray-600 mb-3 leading-relaxed">Menampilkan konfigurasi alamat IP, Subnet Mask, dan Default Gateway dari perangkat yang sedang Anda gunakan, serta mengelola memori DNS lokal.</p>
+                    <div class="bg-gray-50 p-2.5 rounded-lg space-y-1.5 border border-gray-100">
+                        <div class="text-[11px]"><code class="font-bold text-teal bg-teal/10 px-1.5 py-0.5 rounded">ipconfig /all</code> (Win) / <code class="font-bold text-teal bg-teal/10 px-1.5 py-0.5 rounded">ip addr show</code> (Linux) / <code class="font-bold text-teal bg-teal/10 px-1.5 py-0.5 rounded">ifconfig -a</code> (macOS/iOS) : Menampilkan informasi lengkap kartu jaringan & MAC Address.</div>
+                        <div class="text-[11px]"><code class="font-bold text-teal bg-teal/10 px-1.5 py-0.5 rounded">ipconfig /flushdns</code> (Win) / <code class="font-bold text-teal bg-teal/10 px-1.5 py-0.5 rounded">resolvectl flush-caches</code> (Linux) : Menghapus dan menyegarkan kembali memori (*cache*) DNS.</div>
+                    </div>
+                </div>
+
+                <!-- 7. NETSTAT -->
+                <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+                    <div class="flex items-center justify-between border-b border-gray-100 pb-2 mb-2">
+                        <span class="font-bold text-navy text-sm flex items-center gap-2"><i class="fas fa-plug text-teal"></i> 7. NETSTAT (Network Statistics)</span>
+                        <span class="text-[10px] font-mono bg-gray-100 px-2 py-0.5 rounded text-gray-600">Sesi Koneksi</span>
+                    </div>
+                    <p class="text-xs text-gray-600 mb-3 leading-relaxed">Memantau lalu lintas koneksi yang sedang aktif keluar-masuk dari perangkat Anda secara langsung (*real-time*).</p>
+                    <div class="bg-gray-50 p-2.5 rounded-lg space-y-1.5 border border-gray-100">
+                        <div class="text-[11px]"><code class="font-bold text-teal bg-teal/10 px-1.5 py-0.5 rounded">-a</code> : Menampilkan seluruh koneksi aktif dan port yang sedang mendengarkan (*listening*).</div>
+                        <div class="text-[11px]"><code class="font-bold text-teal bg-teal/10 px-1.5 py-0.5 rounded">-n</code> : Menampilkan alamat dan port dalam bentuk angka numerik murni (`192.168.56.1:80`) agar tampil lebih cepat.</div>
+                        <div class="text-[11px]"><code class="font-bold text-teal bg-teal/10 px-1.5 py-0.5 rounded">-o</code> : Menampilkan nomor *Process ID* (PID) untuk melacak aplikasi apa yang diam-diam menggunakan jaringan.</div>
+                    </div>
+                </div>
+
+                <!-- 8. CURL -->
+                <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+                    <div class="flex items-center justify-between border-b border-gray-100 pb-2 mb-2">
+                        <span class="font-bold text-navy text-sm flex items-center gap-2"><i class="fas fa-code text-teal"></i> 8. cURL (Client URL)</span>
+                        <span class="text-[10px] font-mono bg-gray-100 px-2 py-0.5 rounded text-gray-600">Uji Web Server</span>
+                    </div>
+                    <p class="text-xs text-gray-600 mb-3 leading-relaxed">Menguji respons layanan web (HTTP/HTTPS) langsung dari baris perintah. Sangat pas untuk mengecek apakah server autentikasi CAS atau halaman login Captive Portal sedang berjalan normal (`200 OK`).</p>
+                    <div class="bg-gray-50 p-2.5 rounded-lg space-y-1.5 border border-gray-100">
+                        <div class="text-[11px]"><code class="font-bold text-teal bg-teal/10 px-1.5 py-0.5 rounded">-I</code> : Hanya mengambil informasi *Header HTTP* (status server, tipe web server) tanpa mengunduh seluruh isi kode HTML halaman.</div>
+                        <div class="text-[11px]"><code class="font-bold text-teal bg-teal/10 px-1.5 py-0.5 rounded">-k</code> : Mengizinkan pengujian koneksi ke server HTTPS internal meskipun menggunakan sertifikat SSL lokal (*self-signed certificate*).</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab 5: Halaman Google AI (Asisten Jaringan Cerdas) -->
+        <div id="tabAI" class="hidden p-4 w-full max-w-3xl mx-auto flex flex-col h-full gap-3">
+            <!-- Banner Header Google AI -->
+            <div class="bg-gradient-to-r from-navy via-[#243b8a] to-teal text-white p-4 rounded-xl shadow-sm flex items-center justify-between shrink-0">
+                <div class="flex items-center gap-3">
+                    <div class="bg-white/15 p-3 rounded-xl text-gold backdrop-blur-sm border border-white/20">
+                        <i class="fas fa-wand-magic-sparkles text-xl"></i>
+                    </div>
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <h2 class="text-base font-bold">Google Gemini AI</h2>
+                            <span class="text-[10px] bg-gold text-navy font-bold px-2 py-0.5 rounded-full">Net-T93 Assistant</span>
+                        </div>
+                        <p class="text-xs text-gray-100 mt-0.5">Konsultasi topologi, bedah hasil log terminal, & solusi masalah jaringan kantor.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tombol Prompt Cepat (Quick Prompts) -->
+            <div class="flex gap-2 overflow-x-auto pb-1 text-xs shrink-0">
+                <button onclick="sendQuickPrompt('Jelaskan cara kerja autentikasi Captive Portal dengan Server CAS lokal untuk 200 pengguna')" class="bg-white hover:bg-teal/5 text-navy border border-gray-200 px-3 py-1.5 rounded-full font-medium shrink-0 min-h-0 flex items-center gap-1.5 shadow-sm">
+                    <i class="fas fa-bolt text-gold"></i> Konsep Captive Portal CAS
+                </button>
+                <button onclick="sendQuickPrompt('Bagaimana cara membagi VLAN untuk 200 pengguna di kantor menggunakan Switch Manageable dan Access Point?')" class="bg-white hover:bg-teal/5 text-navy border border-gray-200 px-3 py-1.5 rounded-full font-medium shrink-0 min-h-0 flex items-center gap-1.5 shadow-sm">
+                    <i class="fas fa-sitemap text-teal"></i> Desain VLAN 200 User
+                </button>
+                <button onclick="analyzeCurrentTerminalWithAI()" class="bg-white hover:bg-teal/5 text-navy border border-gray-200 px-3 py-1.5 rounded-full font-medium shrink-0 min-h-0 flex items-center gap-1.5 shadow-sm">
+                    <i class="fas fa-terminal text-purple-600"></i> Bedah Output Terminal Terakhir
+                </button>
+            </div>
+
+            <!-- Kotak Percakapan AI (Chat Container) -->
+            <div id="aiChatHistory" class="flex-1 bg-white rounded-xl shadow-sm border border-gray-100 p-4 overflow-y-auto space-y-3 min-h-[260px]">
+                <div class="flex items-start gap-2.5">
+                    <div class="w-8 h-8 rounded-full bg-navy text-gold flex items-center justify-center shrink-0 text-xs font-bold shadow">
+                        <i class="fas fa-robot"></i>
+                    </div>
+                    <div class="bg-gray-50 border border-gray-100 rounded-2xl rounded-tl-none p-3 text-xs text-gray-700 leading-relaxed max-w-[88%]">
+                        Halo Administrator! Saya asisten <b>Google Gemini AI</b> di <b>Net-T93</b>. Anda bisa menempelkan (*paste*) log terminal ke sini, menanyakan rumus subnetting, atau menekan tombol <b>"Analisis AI"</b> langsung dari tab Diagnostik untuk membedah arti dari output perintah jaringan Anda.
+                    </div>
+                </div>
+            </div>
+
+            <!-- Input Chat AI -->
+            <form id="aiChatForm" onsubmit="handleAIChatSubmit(event)" class="bg-white p-2 rounded-xl shadow-sm border border-gray-200 flex items-center gap-2 shrink-0">
+                <input type="text" id="aiUserInput" placeholder="Tanyakan masalah jaringan atau tempel hasil output..." class="flex-1 bg-transparent border-none focus:outline-none text-xs px-2 min-h-[38px]">
+                <button type="submit" id="btnSendAI" class="bg-navy hover:bg-blue-900 text-white px-4 py-2 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors min-h-[38px] shrink-0 android-ripple">
+                    <span>Kirim</span>
+                    <i class="fas fa-paper-plane text-[10px]"></i>
+                </button>
+            </form>
+        </div>
+
+    </main>
+
+    <!-- Bottom Navigation (Mobile/Tablet) Material 3 Style -->
+    <nav class="fixed bottom-0 w-full bg-white border-t border-gray-100 flex justify-around z-40 pb-3 pt-2 shadow-[0_-2px_10px_rgba(0,0,0,0.05)]">
+        <button id="navTabList" onclick="switchTab('list')" class="nav-active flex-1 flex flex-col items-center gap-1 focus:outline-none text-teal transition-colors">
+            <div class="nav-pill flex items-center justify-center text-lg mb-0.5"><i class="fas fa-list"></i></div>
+            <span class="text-[10px] font-medium">Daftar IP</span>
+        </button>
+        <button id="navTabDiag" onclick="switchTab('diag')" class="flex-1 flex flex-col items-center gap-1 focus:outline-none text-gray-500 hover:text-navy transition-colors">
+            <div class="nav-pill flex items-center justify-center text-lg mb-0.5"><i class="fas fa-terminal"></i></div>
+            <span class="text-[10px] font-medium">Diagnostik</span>
+        </button>
+        <button id="navTabTrouble" onclick="switchTab('trouble')" class="flex-1 flex flex-col items-center gap-1 focus:outline-none text-gray-500 hover:text-navy transition-colors">
+            <div class="nav-pill flex items-center justify-center text-lg mb-0.5"><i class="fas fa-stethoscope"></i></div>
+            <span class="text-[10px] font-medium">Troubleshoot</span>
+        </button>
+        <button id="navTabGuide" onclick="switchTab('guide')" class="flex-1 flex flex-col items-center gap-1 focus:outline-none text-gray-500 hover:text-navy transition-colors">
+            <div class="nav-pill flex items-center justify-center text-lg mb-0.5"><i class="fas fa-book-open"></i></div>
+            <span class="text-[10px] font-medium">Panduan</span>
+        </button>
+        <button id="navTabAI" onclick="switchTab('ai')" class="flex-1 flex flex-col items-center gap-1 focus:outline-none text-gray-500 hover:text-navy transition-colors">
+            <div class="nav-pill flex items-center justify-center text-lg mb-0.5"><i class="fas fa-wand-magic-sparkles"></i></div>
+            <span class="text-[10px] font-medium">Google AI</span>
+        </button>
+    </nav>
+
+    <!-- Floating Action Button (FAB) -->
+    <button id="btnFAB" class="fixed bottom-24 right-5 bg-gold hover:bg-yellow-500 text-navy font-bold rounded-2xl w-14 h-14 flex items-center justify-center shadow-lg transform transition-transform hover:scale-105 active:scale-95 focus:outline-none z-30 android-ripple">
+        <i class="fas fa-plus text-xl"></i>
+    </button>
+
+    <!-- Menu Drawer / Action Sheet -->
+    <div id="menuModal" class="fixed inset-0 bg-black/60 z-50 hidden opacity-0 modal-transition flex items-end sm:items-center justify-center pb-0 sm:pb-0">
+        <div class="bg-white w-full sm:w-auto sm:min-w-[350px] rounded-t-2xl sm:rounded-2xl shadow-2xl transform translate-y-full sm:translate-y-0 drawer-transition" id="menuModalContent">
+            <div class="px-5 py-4 flex justify-between items-center border-b border-gray-100">
+                <h2 class="text-lg font-bold text-navy">Pengaturan</h2>
+                <button type="button" onclick="closeMenu()" class="text-gray-400 hover:text-gray-600 bg-gray-50 hover:bg-gray-100 rounded-full w-8 h-8 flex items-center justify-center transition-colors">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="p-4 space-y-2">
+                <button onclick="exportToCSV()" class="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-teal/5 text-gray-700 font-medium transition-colors android-ripple text-left">
+                    <div class="bg-teal/10 w-10 h-10 rounded-lg flex items-center justify-center text-teal"><i class="fas fa-file-csv text-lg"></i></div>
+                    <div>
+                        <p class="text-sm font-bold">Ekspor Data (CSV)</p>
+                        <p class="text-[11px] text-gray-500 font-normal">Unduh daftar IP untuk dibuka di Excel</p>
+                    </div>
+                </button>
+                <button onclick="resetData()" class="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-red-50 text-gray-700 font-medium transition-colors android-ripple text-left mt-2 border border-red-100">
+                    <div class="bg-red-100 w-10 h-10 rounded-lg flex items-center justify-center text-red-500"><i class="fas fa-undo text-lg"></i></div>
+                    <div>
+                        <p class="text-sm font-bold text-red-600">Reset Data Bawaan</p>
+                        <p class="text-[11px] text-red-400 font-normal">Kembalikan ke data awal (Kosong)</p>
+                    </div>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add/Edit Modal Form -->
+    <div id="formModal" class="fixed inset-0 bg-black/60 z-50 hidden opacity-0 modal-transition flex items-end sm:items-center justify-center pb-0 sm:pb-0">
+        <div class="bg-white w-full sm:w-auto sm:min-w-[400px] rounded-t-2xl sm:rounded-2xl shadow-2xl transform translate-y-full sm:translate-y-0 drawer-transition max-h-[90vh] overflow-y-auto" id="formModalContent">
+            <div class="sticky top-0 bg-white border-b border-gray-100 px-5 py-4 flex justify-between items-center z-10">
+                <h2 id="modalTitle" class="text-lg font-bold text-navy">Tambah Perangkat</h2>
+                <button type="button" id="btnCloseModal" class="text-gray-400 hover:text-gray-600 bg-gray-50 hover:bg-gray-100 rounded-full w-8 h-8 flex items-center justify-center transition-colors">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            
+            <form id="deviceForm" class="p-5 space-y-4">
+                <input type="hidden" id="editIndex" value="-1">
+                
+                <div>
+                    <label class="block text-xs font-semibold text-gray-600 mb-1">IP Address <span class="text-red-500">*</span></label>
+                    <div class="relative">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <i class="fas fa-network-wired text-gray-400 text-xs"></i>
+                        </div>
+                        <input type="text" id="ipAddress" required pattern="^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$" placeholder="e.g. 192.168.56.x" title="Masukkan format IP Address yang valid (0-255 per oktet)" class="w-full pl-9 pr-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:border-teal focus:ring-1 focus:ring-teal transition-colors">
+                    </div>
+                </div>
+                
+                <div>
+                    <label class="block text-xs font-semibold text-gray-600 mb-1">Nama Perangkat / Pengguna <span class="text-red-500">*</span></label>
+                    <div class="relative">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <i class="fas fa-laptop text-gray-400 text-xs"></i>
+                        </div>
+                        <input type="text" id="deviceName" required placeholder="e.g. PC-Marketing-01" class="w-full pl-9 pr-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:border-teal focus:ring-1 focus:ring-teal transition-colors">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-gray-600 mb-1">MAC Address (Opsional)</label>
+                    <div class="relative">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <i class="fas fa-fingerprint text-gray-400 text-xs"></i>
+                        </div>
+                        <input type="text" id="macAddress" pattern="^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$" placeholder="e.g. 00:1A:2B:3C:4D:5E" title="Format MAC Address valid (contoh: 00:1A:2B:3C:4D:5E)" class="w-full pl-9 pr-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:border-teal focus:ring-1 focus:ring-teal transition-colors">
+                    </div>
+                </div>
+                
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-600 mb-1">Tipe</label>
+                        <select id="deviceType" class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:border-teal focus:ring-1 focus:ring-teal bg-white">
+                            <option value="PC/Laptop">PC / Laptop</option>
+                            <option value="Access Point">Access Point</option>
+                            <option value="Switch">Switch/Router</option>
+                            <option value="Server">Server</option>
+                            <option value="Mobile">Mobile/Tablet</option>
+                            <option value="Printer">Printer/IoT</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-600 mb-1">Status</label>
+                        <select id="deviceStatus" class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:border-teal focus:ring-1 focus:ring-teal bg-white">
+                            <option value="Aktif">Aktif</option>
+                            <option value="Offline">Offline</option>
+                            <option value="Reserved">Reserved</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="pt-4 pb-2">
+                    <button type="submit" class="w-full bg-navy hover:bg-blue-900 text-white font-medium py-3 rounded-xl shadow-md transition-colors android-ripple">
+                        Simpan Data
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- JavaScript Application Logic -->
+    <script>
+        // --- Data Default (Kosong) ---
+        const defaultData = [];
+
+        let ipData = [];
+        let simTimeout = null; 
+        let currentOS = 'windows'; // 'windows' atau 'unix' (Linux/macOS/iOS)
+        let currentTroubleFilter = 'all';
+
+        // --- Database Skenario Troubleshooting ---
+        const troubleScenarios = [
+            {
+                id: 'cas',
+                badge: 'Autentikasi & Portal',
+                badgeColor: 'bg-amber-100 text-amber-800 border-amber-200',
+                title: 'Klien Terhubung ke Wi-Fi, Tapi Halaman Login Captive Portal / CAS Tidak Muncul',
+                desc: 'Terjadi ketika ponsel/laptop pengguna tersambung ke SSID Wi-Fi kantor namun tidak diarahkan (redirect) ke halaman login autentikasi.',
+                steps: [
+                    {
+                        title: '1. Cek Alokasi IP & Gateway Klien',
+                        desc: 'Pastikan klien mendapat IP segmen 192.168.56.x (bukan IP 169.254.x.x yang menandakan DHCP Pool penuh).',
+                        winCmd: 'ipconfig /all',
+                        unixCmd: 'ifconfig -a',
+                        tool: 'ipconfig'
+                    },
+                    {
+                        title: '2. Uji Resolusi DNS Lokal (Domain Portal)',
+                        desc: 'Pastikan domain halaman login (cas.kantor.lokal) berhasil diterjemahkan ke IP Server Autentikasi (192.168.56.10).',
+                        winCmd: 'nslookup -type=A cas.kantor.lokal',
+                        unixCmd: 'nslookup -type=A cas.kantor.lokal',
+                        tool: 'nslookup'
+                    },
+                    {
+                        title: '3. Bersihkan Cache DNS yang Nyangkut',
+                        desc: 'Jika DNS mengarah ke IP lama, segarkan ingatan cache DNS pada perangkat.',
+                        winCmd: 'ipconfig /flushdns',
+                        unixCmd: 'resolvectl flush-caches',
+                        tool: 'ipconfig'
+                    },
+                    {
+                        title: '4. Cek Respons HTTP/SSL Server Portal',
+                        desc: 'Pastikan web server autentikasi hidup dan mengembalikan status HTTP 200 OK.',
+                        winCmd: 'curl -I -k http://192.168.56.1',
+                        unixCmd: 'curl -I -k http://192.168.56.1',
+                        tool: 'curl'
+                    }
+                ]
+            },
+            {
+                id: 'wifi',
+                badge: 'Performa Wireless',
+                badgeColor: 'bg-teal/15 text-teal border-teal/30',
+                title: 'Koneksi Wi-Fi di Salah Satu Ruangan Lambat / Sering Putus (RTO)',
+                desc: 'Mengisolasi apakah masalah berasal dari Access Point (AP) yang kelebihan beban, kabel LAN/PoE longgar, atau interferensi frekuensi.',
+                steps: [
+                    {
+                        title: '1. Uji Beban Paket Besar ke Access Point',
+                        desc: 'Kirim paket ukuran besar (1000 bytes) ke IP Access Point. Jika latency > 50ms atau RTO, periksa kabel LAN/PoE atau pindahkan channel frekuensi.',
+                        winCmd: 'ping -n 4 -l 1000 192.168.56.1',
+                        unixCmd: 'ping -c 4 -s 1000 192.168.56.1',
+                        tool: 'ping'
+                    },
+                    {
+                        title: '2. Audit Port Manajemen AP & Controller',
+                        desc: 'Periksa apakah layanan manajemen AP (SSH/HTTP/SNMP) merespons dengan cepat.',
+                        winCmd: 'nmap -sV 192.168.56.1',
+                        unixCmd: 'nmap -sV 192.168.56.1',
+                        tool: 'nmap'
+                    }
+                ]
+            },
+            {
+                id: 'conflict',
+                badge: 'Konflik Jaringan',
+                badgeColor: 'bg-red-100 text-red-700 border-red-200',
+                title: 'Deteksi & Lacak Pelaku IP Conflict (Tabrakan IP Statik)',
+                desc: 'Terjadi ketika dua perangkat menggunakan alamat IP yang sama sehingga koneksi salah satu atau keduanya terputus.',
+                steps: [
+                    {
+                        title: '1. Cabut Perangkat Resmi & Ping IP Konflik',
+                        desc: 'Setelah perangkat resmi dicabut, lakukan ping ke IP tersebut. Jika masih Reply, berarti ada perangkat penyerobot.',
+                        winCmd: 'ping -n 4 192.168.56.1',
+                        unixCmd: 'ping -c 4 192.168.56.1',
+                        tool: 'ping'
+                    },
+                    {
+                        title: '2. Tangkap MAC Address Penyerobot via Tabel ARP',
+                        desc: 'Lihat alamat fisik (MAC Address) yang terdaftar pada IP tersebut untuk dilacak atau diblokir di Switch/Router.',
+                        winCmd: 'arp -a',
+                        unixCmd: 'arp -n',
+                        tool: 'arp'
+                    }
+                ]
+            },
+            {
+                id: 'wan',
+                badge: 'Koneksi Eksternal',
+                badgeColor: 'bg-purple-100 text-purple-700 border-purple-200',
+                title: 'Jaringan Lokal (LAN) Normal, Tapi Tidak Bisa Akses Internet',
+                desc: 'Menentukan apakah titik putus berada di Switch Distribusi, Main Router Gateway (192.168.56.1), atau gangguan dari ISP.',
+                steps: [
+                    {
+                        title: '1. Lacak Lompatan Rute (Hop) ke Internet',
+                        desc: 'Jika macet di Hop 1 (192.168.56.1), masalah di Router internal. Jika macet di Hop 2+, masalah di jalur ISP.',
+                        winCmd: 'tracert -d 8.8.8.8',
+                        unixCmd: 'traceroute -n 8.8.8.8',
+                        tool: 'tracert'
+                    },
+                    {
+                        title: '2. Pantau Sesi Koneksi & Port Aktif',
+                        desc: 'Periksa apakah ada lonjakan koneksi mencurigakan (SYN_SENT / TIME_WAIT) yang menghabiskan bandwidth.',
+                        winCmd: 'netstat -a -n -o',
+                        unixCmd: 'netstat -tulnp',
+                        tool: 'netstat'
+                    }
+                ]
+            }
+        ];
+
+        // --- Inisialisasi Aplikasi dengan Proteksi (Try-Catch) ---
+        function initApp() {
+            try {
+                const storedData = localStorage.getItem('ipam_kantor_data');
+                if (storedData) {
+                    ipData = JSON.parse(storedData);
+                    if (!Array.isArray(ipData)) throw new Error("Data korup, bukan array");
+                } else {
+                    ipData = [...defaultData];
+                    saveData();
+                }
+            } catch (e) {
+                console.error("Gagal memuat data lokal:", e);
+                ipData = [...defaultData];
+                saveData();
+            }
+            
+            renderList();
+            updateAttributes(); 
+            renderTroubleCards();
+        }
+
+        // --- Fungsi Pengubah Sistem Operasi (Windows vs Linux/iOS) ---
+        function setOS(os) {
+            currentOS = os;
+            
+            const winBtns = [document.getElementById('btnOsWin'), document.getElementById('btnTroubleOsWin')];
+            const unixBtns = [document.getElementById('btnOsUnix'), document.getElementById('btnTroubleOsUnix')];
+
+            if (os === 'windows') {
+                winBtns.forEach(b => {
+                    if(b) b.className = "flex-1 py-1.5 px-2 rounded-lg text-xs font-bold transition-all bg-white text-navy shadow-sm flex items-center justify-center gap-1.5 min-h-[32px]";
+                });
+                unixBtns.forEach(b => {
+                    if(b) b.className = "flex-1 py-1.5 px-2 rounded-lg text-xs font-bold transition-all text-gray-500 hover:text-navy flex items-center justify-center gap-1.5 min-h-[32px]";
+                });
+            } else {
+                unixBtns.forEach(b => {
+                    if(b) b.className = "flex-1 py-1.5 px-2 rounded-lg text-xs font-bold transition-all bg-white text-navy shadow-sm flex items-center justify-center gap-1.5 min-h-[32px]";
+                });
+                winBtns.forEach(b => {
+                    if(b) b.className = "flex-1 py-1.5 px-2 rounded-lg text-xs font-bold transition-all text-gray-500 hover:text-navy flex items-center justify-center gap-1.5 min-h-[32px]";
+                });
+            }
+
+            updateAttributes();
+            renderTroubleCards();
+        }
+
+        // --- Render Halaman Troubleshooting ---
+        function filterTrouble(category) {
+            currentTroubleFilter = category;
+            const buttons = document.querySelectorAll('.trouble-filter');
+            buttons.forEach(btn => {
+                btn.className = "trouble-filter bg-white text-gray-600 border border-gray-200 px-3 py-1.5 rounded-full font-medium shrink-0 min-h-0";
+            });
+            event.target.className = "trouble-filter bg-navy text-white px-3 py-1.5 rounded-full font-medium shrink-0 min-h-0";
+            renderTroubleCards();
+        }
+
+        function renderTroubleCards() {
+            const container = document.getElementById('troubleCardsContainer');
+            if (!container) return;
+            container.innerHTML = '';
+
+            const filtered = currentTroubleFilter === 'all' 
+                ? troubleScenarios 
+                : troubleScenarios.filter(s => s.id === currentTroubleFilter);
+
+            filtered.forEach(scenario => {
+                let stepsHtml = '';
+                scenario.steps.forEach((step) => {
+                    const activeCmd = currentOS === 'windows' ? step.winCmd : step.unixCmd;
+                    const osBadge = currentOS === 'windows' 
+                        ? '<span class="text-[10px] bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded font-mono border border-blue-200"><i class="fab fa-windows mr-1"></i>CMD/PowerShell</span>'
+                        : '<span class="text-[10px] bg-gray-800 text-gray-100 px-1.5 py-0.5 rounded font-mono"><i class="fab fa-linux mr-1"></i>Bash/iOS Term</span>';
+
+                    stepsHtml += `
+                        <div class="bg-gray-50 p-3 rounded-xl border border-gray-200/80 space-y-2">
+                            <div class="flex justify-between items-start gap-2">
+                                <h4 class="text-xs font-bold text-navy">${step.title}</h4>
+                                ${osBadge}
+                            </div>
+                            <p class="text-[11px] text-gray-600 leading-relaxed">${step.desc}</p>
+                            <div class="flex items-center justify-between bg-[#1e1e1e] text-green-400 px-3 py-2 rounded-lg font-mono text-xs">
+                                <span class="truncate mr-2">${activeCmd}</span>
+                                <button onclick="executeFromTrouble('${step.tool}', '${activeCmd}')" class="bg-teal hover:bg-teal/90 text-white font-sans font-semibold text-[11px] px-2.5 py-1 rounded shrink-0 flex items-center gap-1 min-h-0 shadow">
+                                    <i class="fas fa-play text-[9px]"></i> Uji
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                });
+
+                const card = document.createElement('div');
+                card.className = 'bg-white p-4 rounded-xl shadow-sm border border-gray-100 space-y-3';
+                card.innerHTML = `
+                    <div class="flex items-center justify-between">
+                        <span class="text-[10px] font-bold px-2.5 py-0.5 rounded-full border ${scenario.badgeColor}">${scenario.badge}</span>
+                        <span class="text-[11px] text-gray-400 font-medium">${scenario.steps.length} Langkah</span>
+                    </div>
+                    <div>
+                        <h3 class="text-sm font-bold text-gray-800 leading-snug">${scenario.title}</h3>
+                        <p class="text-xs text-gray-500 mt-1 leading-relaxed">${scenario.desc}</p>
+                    </div>
+                    <div class="space-y-2.5 pt-1">
+                        ${stepsHtml}
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        function executeFromTrouble(toolName, cmdString) {
+            switchTab('diag');
+            document.getElementById('toolSelect').value = toolName;
+            updateAttributes();
+            document.getElementById('diagInput').value = cmdString;
+            runDiagnostic();
+        }
+
+        function saveData() {
+            localStorage.setItem('ipam_kantor_data', JSON.stringify(ipData));
+        }
+
+        // --- Fitur Ekspor CSV ---
+        function exportToCSV() {
+            if(ipData.length === 0) {
+                alert("Tidak ada data untuk diekspor.");
+                return;
+            }
+            let csvContent = "data:text/csv;charset=utf-8,";
+            csvContent += "IP Address,Nama Perangkat,MAC Address,Tipe,Status\n";
+            ipData.forEach(item => {
+                let cleanName = item.name.replace(/,/g, '');
+                const row = [item.ip, cleanName, item.mac || '', item.type, item.status].join(",");
+                csvContent += row + "\n";
+            });
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", "Data_IPAM_Kantor.csv");
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            closeMenu();
+        }
+
+        function resetData() {
+            showConfirmDialog(
+                "Reset Semua Data?",
+                "Tindakan ini akan menghapus semua data saat ini dan mengosongkan daftar IP. Anda yakin?",
+                () => {
+                    ipData = [...defaultData];
+                    saveData();
+                    renderList();
+                    closeMenu();
+                }
+            );
+        }
+
+        // --- Menu Drawer Logic ---
+        const menuModal = document.getElementById('menuModal');
+        const menuModalContent = document.getElementById('menuModalContent');
+        
+        function openMenu() {
+            menuModal.classList.remove('hidden');
+            setTimeout(() => {
+                menuModal.classList.remove('opacity-0');
+                menuModalContent.classList.remove('translate-y-full');
+            }, 10);
+        }
+
+        function closeMenu() {
+            menuModal.classList.add('opacity-0');
+            menuModalContent.classList.add('translate-y-full');
+            setTimeout(() => {
+                menuModal.classList.add('hidden');
+            }, 300);
+        }
+
+        // --- Custom Dialog System ---
+        function showConfirmDialog(title, message, onConfirm) {
+            const dialogOverlay = document.createElement('div');
+            dialogOverlay.className = 'fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4 opacity-0 transition-opacity duration-200';
+            const dialogBox = document.createElement('div');
+            dialogBox.className = 'bg-white rounded-2xl w-full max-w-sm shadow-2xl overflow-hidden transform scale-95 transition-transform duration-200';
+            
+            dialogBox.innerHTML = `
+                <div class="p-6">
+                    <h3 class="text-xl font-semibold text-gray-900 mb-3">${title}</h3>
+                    <p class="text-gray-600 text-sm mb-6">${message}</p>
+                    <div class="flex gap-2 justify-end">
+                        <button id="btnCancelDialog" class="py-2 px-4 text-gray-600 font-medium rounded-lg hover:bg-gray-100 android-ripple">Batal</button>
+                        <button id="btnConfirmDialog" class="py-2 px-4 text-red-600 font-medium rounded-lg hover:bg-red-50 android-ripple">Lanjutkan</button>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(dialogOverlay);
+            
+            setTimeout(() => {
+                dialogOverlay.classList.remove('opacity-0');
+                dialogBox.classList.remove('scale-95');
+            }, 10);
+
+            const closeDialog = () => {
+                dialogOverlay.classList.add('opacity-0');
+                dialogBox.classList.add('scale-95');
+                setTimeout(() => dialogOverlay.remove(), 200);
+            };
+
+            dialogBox.querySelector('#btnCancelDialog').onclick = closeDialog;
+            dialogBox.querySelector('#btnConfirmDialog').onclick = () => {
+                onConfirm();
+                closeDialog();
+            };
+        }
+
+        window.alert = function(message) {
+            const alertOverlay = document.createElement('div');
+            alertOverlay.className = 'fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4 opacity-0 transition-opacity duration-200';
+            const alertBox = document.createElement('div');
+            alertBox.className = 'bg-white rounded-2xl w-full max-w-sm shadow-2xl overflow-hidden transform scale-95 transition-transform duration-200';
+            
+            alertBox.innerHTML = `
+                <div class="p-6">
+                    <p class="text-gray-700 text-sm mb-6 mt-2 leading-relaxed">${message}</p>
+                    <div class="flex justify-end">
+                        <button id="btnOkAlert" class="py-2 px-4 text-teal font-medium rounded-lg hover:bg-teal/10 android-ripple">Oke</button>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(alertOverlay);
+            
+            setTimeout(() => {
+                alertOverlay.classList.remove('opacity-0');
+                alertBox.classList.remove('scale-95');
+            }, 10);
+
+            alertBox.querySelector('#btnOkAlert').onclick = () => {
+                alertOverlay.classList.add('opacity-0');
+                alertBox.classList.add('scale-95');
+                setTimeout(() => alertOverlay.remove(), 200);
+            };
+        }
+
+        // --- Render UI ---
+        function renderList(searchQuery = '') {
+            const container = document.getElementById('ipListContainer');
+            const emptyState = document.getElementById('emptyState');
+            container.innerHTML = '';
+            
+            const query = searchQuery.toLowerCase();
+            const filteredData = ipData.filter(item => 
+                item.ip.toLowerCase().includes(query) || 
+                item.name.toLowerCase().includes(query)
+            );
+
+            filteredData.sort((a, b) => {
+                const numA = a.ip.split('.').map(n => +n + 256).join('.');
+                const numB = b.ip.split('.').map(n => +n + 256).join('.');
+                return numA.localeCompare(numB);
+            });
+
+            if (filteredData.length === 0) {
+                emptyState.classList.remove('hidden');
+                emptyState.classList.add('flex');
+            } else {
+                emptyState.classList.add('hidden');
+                emptyState.classList.remove('flex');
+                
+                filteredData.forEach((item) => {
+                    const originalIndex = ipData.findIndex(x => x.ip === item.ip);
+                    
+                    let statusColor = 'bg-green-100 text-green-700 border-green-200';
+                    let statusDot = 'bg-green-500';
+                    if (item.status === 'Offline') {
+                        statusColor = 'bg-red-100 text-red-700 border-red-200';
+                        statusDot = 'bg-red-500';
+                    } else if (item.status === 'Reserved') {
+                        statusColor = 'bg-gray-100 text-gray-700 border-gray-200';
+                        statusDot = 'bg-gray-500';
+                    }
+
+                    let icon = 'fa-laptop';
+                    if (item.type === 'Access Point') icon = 'fa-wifi';
+                    else if (item.type === 'Switch' || item.type === 'Router') icon = 'fa-network-wired';
+                    else if (item.type === 'Server') icon = 'fa-server';
+                    else if (item.type === 'Mobile') icon = 'fa-mobile-alt';
+                    else if (item.type === 'Printer') icon = 'fa-print';
+
+                    const row = document.createElement('div');
+                    row.className = 'p-3 hover:bg-gray-50 transition-colors flex items-center justify-between group';
+                    row.innerHTML = `
+                        <div class="flex items-center gap-3 overflow-hidden">
+                            <div class="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 shrink-0 border border-gray-200">
+                                <i class="fas ${icon}"></i>
+                            </div>
+                            <div class="min-w-0 flex-1">
+                                <div class="flex items-center gap-2">
+                                    <h3 class="font-bold text-gray-800 text-sm tracking-tight truncate">${item.ip}</h3>
+                                    <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full border ${statusColor} flex items-center gap-1">
+                                        <span class="w-1.5 h-1.5 rounded-full ${statusDot}"></span>
+                                        ${item.status}
+                                    </span>
+                                </div>
+                                <p class="text-xs text-gray-600 truncate font-medium mt-0.5">${item.name}</p>
+                                ${item.mac ? `<p class="text-[10px] text-gray-400 font-mono mt-0.5">${item.mac}</p>` : ''}
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-1 pl-2 shrink-0">
+                            <button onclick="editIP(${originalIndex})" class="w-8 h-8 rounded-full text-teal hover:bg-teal/10 flex items-center justify-center transition-colors">
+                                <i class="fas fa-pen text-sm"></i>
+                            </button>
+                            <button onclick="deleteIP(${originalIndex})" class="w-8 h-8 rounded-full text-red-500 hover:bg-red-50 flex items-center justify-center transition-colors">
+                                <i class="fas fa-trash text-sm"></i>
+                            </button>
+                        </div>
+                    `;
+                    container.appendChild(row);
+                });
+            }
+
+            // Update Stats
+            document.getElementById('statTotalIP').innerText = ipData.length;
+            document.getElementById('statTotalAP').innerText = ipData.filter(i => i.type === 'Access Point').length;
+        }
+
+        // --- CRUD Logic ---
+        function deleteIP(index) {
+            const device = ipData[index];
+            showConfirmDialog(
+                "Hapus Perangkat?",
+                `Apakah Anda yakin ingin menghapus <b>${device.ip}</b> (${device.name}) dari database?`,
+                () => {
+                    ipData.splice(index, 1);
+                    saveData();
+                    renderList(document.getElementById('searchInput').value);
+                }
+            );
+        }
+
+        function editIP(index) {
+            const item = ipData[index];
+            document.getElementById('editIndex').value = index;
+            document.getElementById('ipAddress').value = item.ip;
+            document.getElementById('deviceName').value = item.name;
+            document.getElementById('macAddress').value = item.mac || '';
+            document.getElementById('deviceType').value = item.type;
+            document.getElementById('deviceStatus').value = item.status;
+            
+            document.getElementById('modalTitle').innerText = 'Edit Perangkat';
+            openModal();
+        }
+
+        document.getElementById('deviceForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const index = document.getElementById('editIndex').value;
+            const ip = document.getElementById('ipAddress').value.trim();
+            const name = document.getElementById('deviceName').value.trim();
+            const mac = document.getElementById('macAddress').value.trim();
+            const type = document.getElementById('deviceType').value;
+            const status = document.getElementById('deviceStatus').value;
+
+            const existingIndex = ipData.findIndex(item => item.ip === ip);
+            if (existingIndex !== -1 && existingIndex.toString() !== index) {
+                alert(`IP ${ip} sudah digunakan oleh perangkat lain.`);
+                return;
+            }
+
+            const newData = { ip, name, mac, type, status };
+
+            if (index === '-1') {
+                ipData.push(newData);
+            } else {
+                ipData[index] = newData;
+            }
+
+            saveData();
+            renderList(document.getElementById('searchInput').value);
+            closeModal();
+        });
+
+        // --- Navigasi Tab (Daftar IP, Alat Jaringan, Troubleshoot, Panduan, Google AI) ---
+        function switchTab(tab) {
+            const tabList = document.getElementById('tabList');
+            const tabDiag = document.getElementById('tabDiagnostics');
+            const tabTrouble = document.getElementById('tabTrouble');
+            const tabGuide = document.getElementById('tabGuide');
+            const tabAI = document.getElementById('tabAI');
+            
+            const navList = document.getElementById('navTabList');
+            const navDiag = document.getElementById('navTabDiag');
+            const navTrouble = document.getElementById('navTabTrouble');
+            const navGuide = document.getElementById('navTabGuide');
+            const navAI = document.getElementById('navTabAI');
+            
+            const fab = document.getElementById('btnFAB');
+
+            // Reset semua tampilan
+            tabList.classList.add('hidden');
+            tabDiag.classList.add('hidden');
+            tabTrouble.classList.add('hidden');
+            tabGuide.classList.add('hidden');
+            tabAI.classList.add('hidden');
+
+            [navList, navDiag, navTrouble, navGuide, navAI].forEach(nav => {
+                nav.classList.remove('nav-active', 'text-teal');
+                nav.classList.add('text-gray-500');
+            });
+
+            if (tab === 'list') {
+                tabList.classList.remove('hidden');
+                navList.classList.add('nav-active', 'text-teal');
+                navList.classList.remove('text-gray-500');
+                fab.style.display = 'flex';
+            } else if (tab === 'diag') {
+                tabDiag.classList.remove('hidden');
+                navDiag.classList.add('nav-active', 'text-teal');
+                navDiag.classList.remove('text-gray-500');
+                fab.style.display = 'none';
+            } else if (tab === 'trouble') {
+                tabTrouble.classList.remove('hidden');
+                navTrouble.classList.add('nav-active', 'text-teal');
+                navTrouble.classList.remove('text-gray-500');
+                fab.style.display = 'none';
+            } else if (tab === 'guide') {
+                tabGuide.classList.remove('hidden');
+                navGuide.classList.add('nav-active', 'text-teal');
+                navGuide.classList.remove('text-gray-500');
+                fab.style.display = 'none';
+            } else if (tab === 'ai') {
+                tabAI.classList.remove('hidden');
+                navAI.classList.add('nav-active', 'text-teal');
+                navAI.classList.remove('text-gray-500');
+                fab.style.display = 'none';
+            }
+        }
+        
+        // Android Clock Logic
+        function updateClock() {
+            const now = new Date();
+            let hours = now.getHours();
+            let minutes = now.getMinutes();
+            hours = hours < 10 ? '0' + hours : hours;
+            minutes = minutes < 10 ? '0' + minutes : minutes;
+            document.getElementById('androidClock').textContent = hours + ':' + minutes;
+        }
+        setInterval(updateClock, 1000);
+        updateClock();
+
+        function updateAttributes() {
+            const tool = document.getElementById('toolSelect').value;
+            const attrContainer = document.getElementById('attrOptions');
+            const isWin = currentOS === 'windows';
+            let attrsHtml = '';
+            let defaultCmd = '';
+            let defaultTarget = '192.168.56.1';
+
+            if(tool === 'ping') {
+                if (isWin) {
+                    attrsHtml = `
+                        <label class="inline-flex items-center bg-gray-50 px-2 py-1 border border-gray-200 rounded cursor-pointer hover:bg-gray-100">
+                            <input type="checkbox" class="form-checkbox h-3 w-3 text-teal rounded-sm mr-1" value="-t" onchange="buildCmd()"> <span class="text-[11px] font-mono text-gray-700">-t (Continuous)</span>
+                        </label>
+                        <label class="inline-flex items-center bg-gray-50 px-2 py-1 border border-gray-200 rounded cursor-pointer hover:bg-gray-100">
+                            <input type="checkbox" class="form-checkbox h-3 w-3 text-teal rounded-sm mr-1" value="-n 4" onchange="buildCmd()" checked> <span class="text-[11px] font-mono text-gray-700">-n 4 (Count)</span>
+                        </label>
+                        <label class="inline-flex items-center bg-gray-50 px-2 py-1 border border-gray-200 rounded cursor-pointer hover:bg-gray-100">
+                            <input type="checkbox" class="form-checkbox h-3 w-3 text-teal rounded-sm mr-1" value="-l 32" onchange="buildCmd()" checked> <span class="text-[11px] font-mono text-gray-700">-l 32 (Size)</span>
+                        </label>
+                    `;
+                    defaultCmd = 'ping -n 4 -l 32 ';
+                } else {
+                    attrsHtml = `
+                        <label class="inline-flex items-center bg-gray-50 px-2 py-1 border border-gray-200 rounded cursor-pointer hover:bg-gray-100">
+                            <input type="checkbox" class="form-checkbox h-3 w-3 text-teal rounded-sm mr-1" value="-c 4" onchange="buildCmd()" checked> <span class="text-[11px] font-mono text-gray-700">-c 4 (Count)</span>
+                        </label>
+                        <label class="inline-flex items-center bg-gray-50 px-2 py-1 border border-gray-200 rounded cursor-pointer hover:bg-gray-100">
+                            <input type="checkbox" class="form-checkbox h-3 w-3 text-teal rounded-sm mr-1" value="-s 32" onchange="buildCmd()" checked> <span class="text-[11px] font-mono text-gray-700">-s 32 (Size)</span>
+                        </label>
+                        <label class="inline-flex items-center bg-gray-50 px-2 py-1 border border-gray-200 rounded cursor-pointer hover:bg-gray-100">
+                            <input type="checkbox" class="form-checkbox h-3 w-3 text-teal rounded-sm mr-1" value="-i 0.5" onchange="buildCmd()"> <span class="text-[11px] font-mono text-gray-700">-i 0.5 (Fast Interval)</span>
+                        </label>
+                    `;
+                    defaultCmd = 'ping -c 4 -s 32 ';
+                }
+            } else if(tool === 'arp') {
+                if (isWin) {
+                    attrsHtml = `
+                        <label class="inline-flex items-center bg-gray-50 px-2 py-1 border border-gray-200 rounded cursor-pointer hover:bg-gray-100">
+                            <input type="checkbox" class="form-checkbox h-3 w-3 text-teal rounded-sm mr-1" value="-a" onchange="buildCmd()" checked> <span class="text-[11px] font-mono text-gray-700">-a (Show All)</span>
+                        </label>
+                    `;
+                    defaultCmd = 'arp -a';
+                } else {
+                    attrsHtml = `
+                        <label class="inline-flex items-center bg-gray-50 px-2 py-1 border border-gray-200 rounded cursor-pointer hover:bg-gray-100">
+                            <input type="checkbox" class="form-checkbox h-3 w-3 text-teal rounded-sm mr-1" value="-a" onchange="buildCmd()" checked> <span class="text-[11px] font-mono text-gray-700">-a (BSD Style)</span>
+                        </label>
+                        <label class="inline-flex items-center bg-gray-50 px-2 py-1 border border-gray-200 rounded cursor-pointer hover:bg-gray-100">
+                            <input type="checkbox" class="form-checkbox h-3 w-3 text-teal rounded-sm mr-1" value="-n" onchange="buildCmd()"> <span class="text-[11px] font-mono text-gray-700">-n (Numeric)</span>
+                        </label>
+                    `;
+                    defaultCmd = 'arp -a';
+                }
+                defaultTarget = '';
+            } else if(tool === 'tracert') {
+                if (isWin) {
+                    attrsHtml = `
+                        <label class="inline-flex items-center bg-gray-50 px-2 py-1 border border-gray-200 rounded cursor-pointer hover:bg-gray-100">
+                            <input type="checkbox" class="form-checkbox h-3 w-3 text-teal rounded-sm mr-1" value="-d" onchange="buildCmd()"> <span class="text-[11px] font-mono text-gray-700">-d (No Resolve)</span>
+                        </label>
+                        <label class="inline-flex items-center bg-gray-50 px-2 py-1 border border-gray-200 rounded cursor-pointer hover:bg-gray-100">
+                            <input type="checkbox" class="form-checkbox h-3 w-3 text-teal rounded-sm mr-1" value="-h 30" onchange="buildCmd()" checked> <span class="text-[11px] font-mono text-gray-700">-h 30 (Max Hops)</span>
+                        </label>
+                    `;
+                    defaultCmd = 'tracert -h 30 ';
+                } else {
+                    attrsHtml = `
+                        <label class="inline-flex items-center bg-gray-50 px-2 py-1 border border-gray-200 rounded cursor-pointer hover:bg-gray-100">
+                            <input type="checkbox" class="form-checkbox h-3 w-3 text-teal rounded-sm mr-1" value="-n" onchange="buildCmd()"> <span class="text-[11px] font-mono text-gray-700">-n (No Resolve)</span>
+                        </label>
+                        <label class="inline-flex items-center bg-gray-50 px-2 py-1 border border-gray-200 rounded cursor-pointer hover:bg-gray-100">
+                            <input type="checkbox" class="form-checkbox h-3 w-3 text-teal rounded-sm mr-1" value="-m 30" onchange="buildCmd()" checked> <span class="text-[11px] font-mono text-gray-700">-m 30 (Max Hops)</span>
+                        </label>
+                    `;
+                    defaultCmd = 'traceroute -m 30 ';
+                }
+            } else if(tool === 'nmap') {
+                attrsHtml = `
+                    <label class="inline-flex items-center bg-gray-50 px-2 py-1 border border-gray-200 rounded cursor-pointer hover:bg-gray-100">
+                        <input type="checkbox" class="form-checkbox h-3 w-3 text-teal rounded-sm mr-1" value="-sV" onchange="buildCmd()"> <span class="text-[11px] font-mono text-gray-700">-sV (Service Ver)</span>
+                    </label>
+                    <label class="inline-flex items-center bg-gray-50 px-2 py-1 border border-gray-200 rounded cursor-pointer hover:bg-gray-100">
+                        <input type="checkbox" class="form-checkbox h-3 w-3 text-teal rounded-sm mr-1" value="-O" onchange="buildCmd()"> <span class="text-[11px] font-mono text-gray-700">-O (OS Detect)</span>
+                    </label>
+                    <label class="inline-flex items-center bg-gray-50 px-2 py-1 border border-gray-200 rounded cursor-pointer hover:bg-gray-100">
+                        <input type="checkbox" class="form-checkbox h-3 w-3 text-teal rounded-sm mr-1" value="-p 1-1000" onchange="buildCmd()"> <span class="text-[11px] font-mono text-gray-700">-p (Ports)</span>
+                    </label>
+                `;
+                defaultCmd = 'nmap ';
+            } else if(tool === 'nslookup') {
+                attrsHtml = `
+                    <label class="inline-flex items-center bg-gray-50 px-2 py-1 border border-gray-200 rounded cursor-pointer hover:bg-gray-100">
+                        <input type="checkbox" class="form-checkbox h-3 w-3 text-teal rounded-sm mr-1" value="-type=A" onchange="buildCmd()" checked> <span class="text-[11px] font-mono text-gray-700">-type=A (IPv4)</span>
+                    </label>
+                    <label class="inline-flex items-center bg-gray-50 px-2 py-1 border border-gray-200 rounded cursor-pointer hover:bg-gray-100">
+                        <input type="checkbox" class="form-checkbox h-3 w-3 text-teal rounded-sm mr-1" value="-type=PTR" onchange="buildCmd()"> <span class="text-[11px] font-mono text-gray-700">-type=PTR (Reverse)</span>
+                    </label>
+                `;
+                defaultCmd = 'nslookup -type=A ';
+                defaultTarget = 'cas.kantor.lokal';
+            } else if(tool === 'ipconfig') {
+                if (isWin) {
+                    attrsHtml = `
+                        <label class="inline-flex items-center bg-gray-50 px-2 py-1 border border-gray-200 rounded cursor-pointer hover:bg-gray-100">
+                            <input type="checkbox" class="form-checkbox h-3 w-3 text-teal rounded-sm mr-1" value="/all" onchange="buildCmd()" checked> <span class="text-[11px] font-mono text-gray-700">/all (Detailed)</span>
+                        </label>
+                        <label class="inline-flex items-center bg-gray-50 px-2 py-1 border border-gray-200 rounded cursor-pointer hover:bg-gray-100">
+                            <input type="checkbox" class="form-checkbox h-3 w-3 text-teal rounded-sm mr-1" value="/flushdns" onchange="buildCmd()"> <span class="text-[11px] font-mono text-gray-700">/flushdns (Clear DNS)</span>
+                        </label>
+                    `;
+                    defaultCmd = 'ipconfig /all';
+                } else {
+                    attrsHtml = `
+                        <label class="inline-flex items-center bg-gray-50 px-2 py-1 border border-gray-200 rounded cursor-pointer hover:bg-gray-100">
+                            <input type="checkbox" class="form-checkbox h-3 w-3 text-teal rounded-sm mr-1" value="-a" onchange="buildCmd()" checked> <span class="text-[11px] font-mono text-gray-700">-a (All Interfaces)</span>
+                        </label>
+                    `;
+                    defaultCmd = 'ifconfig -a';
+                }
+                defaultTarget = '';
+            } else if(tool === 'netstat') {
+                if (isWin) {
+                    attrsHtml = `
+                        <label class="inline-flex items-center bg-gray-50 px-2 py-1 border border-gray-200 rounded cursor-pointer hover:bg-gray-100">
+                            <input type="checkbox" class="form-checkbox h-3 w-3 text-teal rounded-sm mr-1" value="-a" onchange="buildCmd()" checked> <span class="text-[11px] font-mono text-gray-700">-a (All Ports)</span>
+                        </label>
+                        <label class="inline-flex items-center bg-gray-50 px-2 py-1 border border-gray-200 rounded cursor-pointer hover:bg-gray-100">
+                            <input type="checkbox" class="form-checkbox h-3 w-3 text-teal rounded-sm mr-1" value="-n" onchange="buildCmd()" checked> <span class="text-[11px] font-mono text-gray-700">-n (Numeric IP)</span>
+                        </label>
+                        <label class="inline-flex items-center bg-gray-50 px-2 py-1 border border-gray-200 rounded cursor-pointer hover:bg-gray-100">
+                            <input type="checkbox" class="form-checkbox h-3 w-3 text-teal rounded-sm mr-1" value="-o" onchange="buildCmd()"> <span class="text-[11px] font-mono text-gray-700">-o (PID)</span>
+                        </label>
+                    `;
+                    defaultCmd = 'netstat -a -n';
+                } else {
+                    attrsHtml = `
+                        <label class="inline-flex items-center bg-gray-50 px-2 py-1 border border-gray-200 rounded cursor-pointer hover:bg-gray-100">
+                            <input type="checkbox" class="form-checkbox h-3 w-3 text-teal rounded-sm mr-1" value="-tuln" onchange="buildCmd()" checked> <span class="text-[11px] font-mono text-gray-700">-tuln (TCP/UDP Listening)</span>
+                        </label>
+                        <label class="inline-flex items-center bg-gray-50 px-2 py-1 border border-gray-200 rounded cursor-pointer hover:bg-gray-100">
+                            <input type="checkbox" class="form-checkbox h-3 w-3 text-teal rounded-sm mr-1" value="-p" onchange="buildCmd()"> <span class="text-[11px] font-mono text-gray-700">-p (Process/PID)</span>
+                        </label>
+                    `;
+                    defaultCmd = 'netstat -tuln';
+                }
+                defaultTarget = '';
+            } else if(tool === 'curl') {
+                attrsHtml = `
+                    <label class="inline-flex items-center bg-gray-50 px-2 py-1 border border-gray-200 rounded cursor-pointer hover:bg-gray-100">
+                        <input type="checkbox" class="form-checkbox h-3 w-3 text-teal rounded-sm mr-1" value="-I" onchange="buildCmd()" checked> <span class="text-[11px] font-mono text-gray-700">-I (Headers Only)</span>
+                    </label>
+                    <label class="inline-flex items-center bg-gray-50 px-2 py-1 border border-gray-200 rounded cursor-pointer hover:bg-gray-100">
+                        <input type="checkbox" class="form-checkbox h-3 w-3 text-teal rounded-sm mr-1" value="-k" onchange="buildCmd()"> <span class="text-[11px] font-mono text-gray-700">-k (Insecure SSL)</span>
+                    </label>
+                `;
+                defaultCmd = 'curl -I ';
+                defaultTarget = 'http://192.168.56.1';
+            }
+
+            attrContainer.innerHTML = attrsHtml;
+            document.getElementById('diagInput').value = (defaultCmd + defaultTarget).trim();
+        }
+
+        function buildCmd() {
+            const tool = document.getElementById('toolSelect').value;
+            const isWin = currentOS === 'windows';
+            const checkboxes = document.querySelectorAll('#attrOptions input[type="checkbox"]:checked');
+            
+            let baseCmd = tool;
+            if (!isWin && tool === 'tracert') baseCmd = 'traceroute';
+            if (!isWin && tool === 'ipconfig') baseCmd = 'ifconfig';
+
+            let cmdParts = [baseCmd];
+            checkboxes.forEach(cb => cmdParts.push(cb.value));
+            
+            const noTargetTools = ['ipconfig', 'netstat', 'arp'];
+            if (!noTargetTools.includes(tool)) {
+                const currentParts = document.getElementById('diagInput').value.trim().split(' ');
+                const lastPart = currentParts[currentParts.length - 1];
+                let ipToUse = "192.168.56.1";
+                if (tool === 'nslookup') ipToUse = "cas.kantor.lokal";
+                if (tool === 'curl') ipToUse = "http://192.168.56.1";
+                
+                if (lastPart && !lastPart.startsWith('-') && !lastPart.startsWith('/') && lastPart !== tool && lastPart !== 'traceroute' && lastPart !== 'ifconfig') {
+                    ipToUse = lastPart;
+                }
+                cmdParts.push(ipToUse);
+            }
+            
+            document.getElementById('diagInput').value = cmdParts.join(' ');
+        }
+
+        function printToTerminal(text, delay = 0, breakLine = true) {
+            const term = document.getElementById('terminalOutput');
+            setTimeout(() => {
+                term.innerHTML += text + (breakLine ? '<br>' : '');
+                term.scrollTop = term.scrollHeight;
+            }, delay);
+        }
+
+        function clearTerminal() {
+            document.getElementById('terminalOutput').innerHTML = '';
+            document.getElementById('easySummaryCard').classList.add('hidden');
+            if(simTimeout) {
+                clearTimeout(simTimeout);
+                simTimeout = null;
+            }
+        }
+
+        // --- Fitur Copy Output Terminal ---
+        function copyTerminalOutput() {
+            const term = document.getElementById('terminalOutput');
+            const rawText = term.innerText || term.textContent;
+            if (!rawText.trim()) {
+                alert("Output terminal masih kosong. Jalankan simulasi terlebih dahulu.");
+                return;
+            }
+
+            const tempTextArea = document.createElement('textarea');
+            tempTextArea.value = rawText;
+            document.body.appendChild(tempTextArea);
+            tempTextArea.select();
+            document.execCommand('copy');
+            document.body.removeChild(tempTextArea);
+
+            const btn = document.getElementById('btnCopyTerm');
+            const originalHTML = btn.innerHTML;
+            btn.innerHTML = `<i class="fas fa-check text-green-400"></i> Tersalin!`;
+            setTimeout(() => {
+                btn.innerHTML = originalHTML;
+            }, 2000);
+        }
+
+        // --- Fitur Membaca Output Tool yang Mudah Dipahami ---
+        function showEasyExplanation(cmd, target, extraInfo = {}) {
+            const card = document.getElementById('easySummaryCard');
+            const content = document.getElementById('easySummaryContent');
+            const badge = document.getElementById('summaryStatusBadge');
+
+            card.classList.remove('hidden');
+            badge.className = "text-[10px] font-bold px-2 py-0.5 rounded-full bg-green-100 text-green-700 border border-green-200";
+            badge.innerText = "Koneksi Sehat";
+
+            let html = '';
+            if (cmd === 'ping') {
+                html = `
+                    <p>✅ <b>Status Perangkat:</b> Target <code class="font-bold text-navy">${target}</code> merespons dengan sangat baik (<b>Online / Aktif</b>).</p>
+                    <p>⚡ <b>Kecepatan Respons (Latency):</b> Rata-rata waktu tempuh paket sangat cepat (<b>1 - 4 milidetik</b>). Standar jaringan lokal yang sehat adalah di bawah 10ms.</p>
+                    <p>📦 <b>Keutuhan Paket Data:</b> <b>0% Packet Loss</b> (Tidak ada data yang hilang di jalan saat mengirim beban sebesar ${extraInfo.bytes || 32} bytes). Kabel LAN atau sinyal Wi-Fi stabil.</p>
+                    <p>⏳ <b>Arti TTL=64:</b> Menandakan perangkat target berbasis Linux/RouterOS/Access Point dan berada langsung di jaringan lokal tanpa melewati banyak router.</p>
+                `;
+            } else if (cmd === 'arp') {
+                html = `
+                    <p>🔍 <b>Apa yang Ditampilkan:</b> Daftar di atas adalah kecocokan antara <b>Alamat IP</b> dan <b>Alamat Fisik (MAC Address)</b> perangkat di jaringan lokal Anda.</p>
+                    <p>🛡️ <b>Deteksi IP Conflict:</b> Gateway utama <code class="font-bold text-navy">192.168.56.1</code> terhubung ke MAC Address <code class="font-mono">00:1a:2b:3c:4d:01</code>. Jika ada dua IP berbeda yang memiliki MAC Address sama persis, atau ada MAC asing pada IP server Anda, segera blokir di Switch.</p>
+                `;
+            } else if (cmd === 'tracert' || cmd === 'traceroute') {
+                html = `
+                    <p>🛣️ <b>Jalur Perjalanan Paket:</b> Data dari perangkat Anda menuju <code class="font-bold text-navy">${target}</code> hanya melewati <b>2 titik lompatan (Hops)</b>.</p>
+                    <p>1️⃣ <b>Lompatan 1 (192.168.56.1):</b> Paket keluar melewati Router Gateway kantor Anda dalam waktu kurang dari <b>1 ms</b> (Jaringan internal antara AP/Switch ke Router sangat lancar).</p>
+                    <p>2️⃣ <b>Lompatan 2 (${target}):</b> Paket tiba di tujuan akhir dalam waktu sekitar <b>2 ms</b> tanpa hambatan (*bottleneck*).</p>
+                `;
+            } else if (cmd === 'nmap') {
+                badge.className = "text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 border border-blue-200";
+                badge.innerText = "Hasil Audit Port";
+                html = `
+                    <p>🔓 <b>Port Terbuka yang Ditemukan pada ${target}:</b></p>
+                    <ul class="list-disc pl-4 space-y-1">
+                        <li><b>Port 22 (SSH):</b> Terbuka — Digunakan oleh teknisi IT untuk konfigurasi jarak jauh via terminal.</li>
+                        <li><b>Port 80 (HTTP) & 443 (HTTPS):</b> Terbuka — Menandakan layanan halaman web manajemen perangkat atau halaman login <i>Captive Portal</i> sedang aktif.</li>
+                    </ul>
+                    <p>💡 <b>Kesimpulan Keamanan:</b> Sebanyak 997 port lainnya berstatus <b>Closed (Tertutup)</b>, artinya perangkat ini aman dari celah port liar.</p>
+                `;
+            } else if (cmd === 'nslookup') {
+                html = `
+                    <p>🌐 <b>Hasil Translasi Domain (DNS):</b> Nama domain lokal <code class="font-bold text-navy">${target}</code> berhasil diterjemahkan menjadi alamat IP <code class="font-bold text-teal">192.168.56.10</code>.</p>
+                    <p>✅ <b>Kesimpulan:</b> Server DNS lokal di Gateway (<code class="font-mono">192.168.56.1</code>) bekerja normal. Pengguna Wi-Fi dapat membuka alamat halaman login portal tanpa kendala <i>"Server Not Found"</i>.</p>
+                `;
+            } else if (cmd === 'ipconfig' || cmd === 'ifconfig' || cmd === 'resolvectl') {
+                if (extraInfo.isFlush) {
+                    html = `
+                        <p>🧹 <b>Pembersihan Memori DNS Berhasil:</b> Seluruh riwayat alamat domain lama yang tersimpan di perangkat Anda telah dihapus.</p>
+                        <p>💡 <b>Manfaat:</b> Perangkat kini akan meminta ulang alamat IP terbaru dari server DNS kantor. Sangat ampuh mengatasi halaman login Wi-Fi yang gagal terbuka.</p>
+                    `;
+                } else {
+                    html = `
+                        <p>💻 <b>Identitas Perangkat Anda di Jaringan:</b></p>
+                        <ul class="list-disc pl-4 space-y-1">
+                            <li><b>IP Address Anda:</b> <code class="font-bold text-navy">192.168.56.101</code> (Sudah berada di segmen jaringan kantor yang benar).</li>
+                            <li><b>Subnet Mask:</b> <code class="font-mono">255.255.255.0</code> (/24 — Kapasitas hingga 254 perangkat).</li>
+                            <li><b>Default Gateway:</b> <code class="font-bold text-teal">192.168.56.1</code> (Pintu keluar utama menuju internet/router).</li>
+                        </ul>
+                    `;
+                }
+            } else if (cmd === 'netstat') {
+                html = `
+                    <p>🔌 <b>Daftar Koneksi yang Sedang Aktif:</b></p>
+                    <ul class="list-disc pl-4 space-y-1">
+                        <li>Perangkat Anda (<code class="font-mono">.101</code>) sedang terhubung aktif (<b>ESTABLISHED</b>) ke Gateway <code class="font-mono">192.168.56.1</code> pada <b>Port 80 (Web HTTP)</b>.</li>
+                        <li>Terdapat juga sesi koneksi aman ke Server Autentikasi CAS (<code class="font-mono">192.168.56.10</code>) pada <b>Port 443 (HTTPS)</b>.</li>
+                    </ul>
+                    <p>✅ <b>Kesimpulan:</b> Tidak ditemukan koneksi mencurigakan atau program liar yang menyedot <i>bandwidth</i>.</p>
+                `;
+            } else if (cmd === 'curl') {
+                html = `
+                    <p>🟢 <b>Respons Web Server:</b> <code class="font-bold text-green-700 bg-green-100 px-1.5 py-0.5 rounded">HTTP/1.1 200 OK</code></p>
+                    <p>📖 <b>Artinya:</b> Layanan web server (<b>Nginx 1.24.0</b>) dan sistem autentikasi <b>CAS-Auth-Server</b> pada target dalam kondisi hidup dan siap melayani permintaan login pengguna.</p>
+                `;
+            }
+
+            content.innerHTML = html;
+        }
+
+        function runDiagnostic() {
+            const inputVal = document.getElementById('diagInput').value.trim();
+            if (!inputVal) {
+                alert("Harap masukkan perintah atau target.");
+                return;
+            }
+
+            if(simTimeout) clearTimeout(simTimeout);
+            clearTerminal();
+            
+            const isWin = currentOS === 'windows';
+            const parts = inputVal.split(' ');
+            const cmd = parts[0].toLowerCase();
+            const isContinuous = parts.includes('-t') || (!isWin && cmd === 'ping' && !parts.includes('-c'));
+            const target = parts[parts.length - 1];
+            
+            let bytesSize = "32";
+            let lIndex = parts.indexOf('-l') !== -1 ? parts.indexOf('-l') : parts.indexOf('-s');
+            if(lIndex !== -1 && parts.length > lIndex+1) {
+                bytesSize = parts[lIndex+1];
+            }
+
+            const promptPrefix = isWin 
+                ? `<span class="text-white">C:\\Users\\Net-T93></span>` 
+                : `<span class="text-teal font-bold">root@net-t93:~#</span>`;
+
+            printToTerminal(`${promptPrefix} ${inputVal}`, 0);
+            
+            if (cmd === 'ping') {
+                if (isWin) {
+                    printToTerminal(`Pinging ${target} with ${bytesSize} bytes of data:`, 400);
+                } else {
+                    printToTerminal(`PING ${target} (${target}) ${bytesSize}(${parseInt(bytesSize)+28}) bytes of data.`, 400);
+                }
+                
+                let i = 0;
+                let limit = isContinuous ? 8 : 4; 
+                
+                function doPing() {
+                    const time = (Math.random() * 3 + 1).toFixed(1);
+                    if (isWin) {
+                        printToTerminal(`Reply from ${target}: bytes=${bytesSize} time=${Math.round(time)}ms TTL=64`);
+                    } else {
+                        printToTerminal(`${parseInt(bytesSize)+8} bytes from ${target}: icmp_seq=${i+1} ttl=64 time=${time} ms`);
+                    }
+                    i++;
+                    if (i < limit) {
+                        simTimeout = setTimeout(doPing, 800);
+                    } else {
+                        if (isWin) {
+                            printToTerminal(`${isContinuous ? '^C<br>' : '<br>'}Ping statistics for ${target}:<br>    Packets: Sent = ${i}, Received = ${i}, Lost = 0 (0% loss)`);
+                        } else {
+                            printToTerminal(`${isContinuous ? '^C<br>' : '<br>'}--- ${target} ping statistics ---<br>${i} packets transmitted, ${i} received, 0% packet loss, time ${i*800}ms`);
+                        }
+                        showEasyExplanation('ping', target, { bytes: bytesSize });
+                    }
+                }
+                simTimeout = setTimeout(doPing, 1000);
+
+            } else if (cmd === 'arp') {
+                if (isWin) {
+                    printToTerminal(`Interface: 192.168.56.101 --- 0x4`, 400);
+                    printToTerminal(`  Internet Address      Physical Address      Type`, 500);
+                    printToTerminal(`  192.168.56.1          00-1a-2b-3c-4d-01     dynamic`, 650);
+                } else {
+                    printToTerminal(`? (192.168.56.1) at 00:1a:2b:3c:4d:01 [ether] on eth0`, 500);
+                }
+                
+                let delay = 800;
+                ipData.forEach(item => {
+                    if (item.mac && item.ip !== "192.168.56.101" && item.ip !== "192.168.56.1") {
+                        if (isWin) {
+                            printToTerminal(`  ${item.ip.padEnd(20, ' ')}  ${item.mac.replace(/:/g, '-').toLowerCase().padEnd(20, ' ')}  dynamic`, delay);
+                        } else {
+                            printToTerminal(`? (${item.ip}) at ${item.mac.toLowerCase()} [ether] on eth0`, delay);
+                        }
+                        delay += 150;
+                    }
+                });
+                simTimeout = setTimeout(() => showEasyExplanation('arp', target), delay + 200);
+
+            } else if (cmd === 'tracert' || cmd === 'traceroute') {
+                if (isWin) {
+                    printToTerminal(`Tracing route to ${target} over a maximum of 30 hops:<br>`, 400);
+                    printToTerminal(`  1    <1 ms    <1 ms    <1 ms  192.168.56.1`, 1000);
+                    printToTerminal(`  2     2 ms     1 ms     2 ms  ${target}`, 1600);
+                    printToTerminal(`<br>Trace complete.`, 2000);
+                } else {
+                    printToTerminal(`traceroute to ${target} (${target}), 30 hops max, 60 byte packets`, 400);
+                    printToTerminal(` 1  192.168.56.1 (192.168.56.1)  0.812 ms  0.745 ms  0.699 ms`, 1000);
+                    printToTerminal(` 2  ${target} (${target})  1.924 ms  1.880 ms  1.810 ms`, 1600);
+                }
+                simTimeout = setTimeout(() => showEasyExplanation('tracert', target), 2100);
+
+            } else if (cmd === 'nmap') {
+                printToTerminal(`Starting Nmap 7.93 ( https://nmap.org ) at ${new Date().toLocaleString()}`, 500);
+                printToTerminal(`Nmap scan report for ${target}`, 1200);
+                printToTerminal(`Host is up (0.0021s latency).`, 1500);
+                printToTerminal(`Not shown: 997 closed tcp ports (reset)`, 2500);
+                printToTerminal(`PORT     STATE SERVICE`, 2800);
+                
+                let delay = 3200;
+                printToTerminal(`22/tcp   open  ssh`, delay); delay += 300;
+                printToTerminal(`80/tcp   open  http`, delay); delay += 300;
+                if(target === "192.168.56.1" || target === "192.168.56.2") {
+                    printToTerminal(`443/tcp  open  https`, delay); delay += 300;
+                }
+                
+                const sV = parts.includes('-sV');
+                const sO = parts.includes('-O');
+                
+                if (sV || sO) {
+                    printToTerminal(`<br>Running advanced detection scripts...`, delay+500);
+                    printToTerminal(`MAC Address: ${Math.random().toString(16).substr(2,2).toUpperCase()}:AA:BB:CC:DD:EE (Enterprise Wireless AP)`, delay+1500);
+                }
+
+                simTimeout = setTimeout(() => {
+                    printToTerminal(`<br>Nmap done: 1 IP address (1 host up) scanned in 4.52 seconds.`);
+                    showEasyExplanation('nmap', target);
+                }, delay + 2000);
+
+            } else if (cmd === 'nslookup') {
+                printToTerminal(`Server:  gateway.kantor.lokal`, 400);
+                printToTerminal(`Address:  192.168.56.1<br>`, 600);
+                printToTerminal(`Non-authoritative answer:`, 1200);
+                printToTerminal(`Name:    ${target}`, 1400);
+                printToTerminal(`Address:  192.168.56.10`, 1600);
+                simTimeout = setTimeout(() => showEasyExplanation('nslookup', target), 1800);
+
+            } else if (cmd === 'ipconfig' || cmd === 'ifconfig' || cmd === 'resolvectl') {
+                const isFlush = parts.includes('/flushdns') || cmd === 'resolvectl';
+                if (isFlush) {
+                    if (isWin) {
+                        printToTerminal(`<br>Windows IP Configuration<br>`, 400);
+                        printToTerminal(`Successfully flushed the DNS Resolver Cache.`, 900);
+                    } else {
+                        printToTerminal(`Flushed all local DNS caches (systemd-resolved / mDNSResponder).`, 700);
+                    }
+                    simTimeout = setTimeout(() => showEasyExplanation('ipconfig', target, { isFlush: true }), 1100);
+                } else if (isWin) {
+                    printToTerminal(`<br>Windows IP Configuration<br>`, 400);
+                    printToTerminal(`Wireless LAN adapter Wi-Fi:`, 600);
+                    printToTerminal(`   Connection-specific DNS Suffix  . : kantor.lokal`, 800);
+                    if (parts.includes('/all')) {
+                        printToTerminal(`   Description . . . . . . . . . . . : IEEE 802.11ax Wireless LAN Card`, 950);
+                        printToTerminal(`   Physical Address. . . . . . . . . : A4-5E-60-C8-99-12`, 1100);
+                        printToTerminal(`   DHCP Enabled. . . . . . . . . . . : Yes`, 1250);
+                    }
+                    printToTerminal(`   IPv4 Address. . . . . . . . . . . : 192.168.56.101`, 1400);
+                    printToTerminal(`   Subnet Mask . . . . . . . . . . . : 255.255.255.0`, 1550);
+                    printToTerminal(`   Default Gateway . . . . . . . . . : 192.168.56.1`, 1700);
+                    simTimeout = setTimeout(() => showEasyExplanation('ipconfig', target, { isFlush: false }), 1900);
+                } else {
+                    printToTerminal(`en0: flags=8863<UP,BROADCAST,SMART,RUNNING,SIMPLEX,MULTICAST> mtu 1500`, 400);
+                    printToTerminal(`    ether a4:5e:60:c8:99:12`, 600);
+                    printToTerminal(`    inet 192.168.56.101 netmask 0xffffff00 broadcast 192.168.56.255`, 800);
+                    printToTerminal(`    status: active (Office-Enterprise-WiFi)`, 1000);
+                    simTimeout = setTimeout(() => showEasyExplanation('ifconfig', target, { isFlush: false }), 1200);
+                }
+
+            } else if (cmd === 'netstat') {
+                const showPid = parts.includes('-o') || parts.includes('-p') || parts.includes('-tulnp');
+                if (isWin) {
+                    printToTerminal(`<br>Active Connections<br>`, 400);
+                    printToTerminal(`  Proto  Local Address          Foreign Address        State           ${showPid ? 'PID' : ''}`, 700);
+                    printToTerminal(`  TCP    192.168.56.101:51234   192.168.56.1:80        ESTABLISHED     ${showPid ? '4120' : ''}`, 1000);
+                    printToTerminal(`  TCP    192.168.56.101:51239   192.168.56.10:443      ESTABLISHED     ${showPid ? '8812' : ''}`, 1300);
+                } else {
+                    printToTerminal(`Active Internet connections (only servers & established)`, 400);
+                    printToTerminal(`Proto Recv-Q Send-Q Local Address           Foreign Address         State       ${showPid ? 'PID/Program name' : ''}`, 700);
+                    printToTerminal(`tcp        0      0 192.168.56.101:51234    192.168.56.1:80         ESTABLISHED ${showPid ? '4120/curl' : ''}`, 1000);
+                    printToTerminal(`tcp        0      0 192.168.56.101:51239    192.168.56.10:443       ESTABLISHED ${showPid ? '8812/safari' : ''}`, 1300);
+                }
+                simTimeout = setTimeout(() => showEasyExplanation('netstat', target), 1500);
+
+            } else if (cmd === 'curl') {
+                printToTerminal(`HTTP/1.1 200 OK`, 800);
+                printToTerminal(`Server: nginx/1.24.0 (Ubuntu)`, 1000);
+                printToTerminal(`Date: ${new Date().toUTCString()}`, 1150);
+                printToTerminal(`Content-Type: text/html; charset=UTF-8`, 1300);
+                printToTerminal(`Connection: keep-alive`, 1450);
+                printToTerminal(`X-Powered-By: CAS-Auth-Server`, 1600);
+                simTimeout = setTimeout(() => showEasyExplanation('curl', target), 1800);
+
+            } else {
+                printToTerminal(`'${cmd}' is not recognized as an internal or external command, operable program or batch file.`, 100);
+            }
+        }
+
+        // --- Integrasi Halaman Google Gemini AI ---
+        function appendChatMessage(role, htmlText) {
+            const history = document.getElementById('aiChatHistory');
+            const wrapper = document.createElement('div');
+            wrapper.className = role === 'user' ? 'flex items-start justify-end gap-2.5' : 'flex items-start gap-2.5';
+
+            if (role === 'user') {
+                wrapper.innerHTML = `
+                    <div class="bg-navy text-white rounded-2xl rounded-tr-none p-3 text-xs leading-relaxed max-w-[85%] shadow-sm">
+                        ${htmlText}
+                    </div>
+                `;
+            } else {
+                wrapper.innerHTML = `
+                    <div class="w-8 h-8 rounded-full bg-navy text-gold flex items-center justify-center shrink-0 text-xs font-bold shadow">
+                        <i class="fas fa-wand-magic-sparkles"></i>
+                    </div>
+                    <div class="bg-gray-50 border border-gray-100 rounded-2xl rounded-tl-none p-3 text-xs text-gray-800 leading-relaxed max-w-[88%] space-y-1.5">
+                        ${htmlText}
+                    </div>
+                `;
+            }
+            history.appendChild(wrapper);
+            history.scrollTop = history.scrollHeight;
+            return wrapper;
+        }
+
+        async function callGeminiAPI(userPrompt) {
+            const apiKey = "";
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`;
+            const systemPrompt = "Anda adalah Asisten Jaringan Senior di dalam aplikasi Net-T93 Network Manager. Tugas Anda membantu administrator jaringan kantor (gateway utama 192.168.56.1, kapasitas ~200 user, memiliki server autentikasi CAS dan Access Point Wi-Fi). Jelaskan hasil output tool jaringan (ping, arp, tracert, nmap, nslookup, ipconfig, netstat, curl) atau pertanyaan teknis dengan bahasa Indonesia yang sangat ramah, terstruktur, ringkas, dan mudah dipahami oleh pemula maupun teknisi.";
+
+            const payload = {
+                contents: [{ parts: [{ text: userPrompt }] }],
+                systemInstruction: { parts: [{ text: systemPrompt }] }
+            };
+
+            const delays = [1000, 2000, 4000];
+            for (let attempt = 0; attempt <= delays.length; attempt++) {
+                try {
+                    const response = await fetch(apiUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                    const result = await response.json();
+                    const text = result.candidates?.[0]?.content?.parts?.[0]?.text;
+                    if (text) return text;
+                    throw new Error("Empty response");
+                } catch (err) {
+                    if (attempt === delays.length) {
+                        return "Maaf, koneksi ke layanan Google AI sedang sibuk. Namun berdasarkan analisis lokal Net-T93, pastikan Gateway `192.168.56.1` merespons ping di bawah 10ms dan DNS lokal mengarah ke server autentikasi yang tepat.";
+                    }
+                    await new Promise(r => setTimeout(r, delays[attempt]));
+                }
+            }
+        }
+
+        function formatMarkdownSimple(text) {
+            return text
+                .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+                .replace(/\*\*(.*?)\*\*/g, '<b>$1</b>')
+                .replace(/`(.*?)`/g, '<code class="bg-teal/10 text-navy px-1 py-0.5 rounded font-mono text-[11px]">$1</code>')
+                .replace(/\n/g, '<br>');
+        }
+
+        async function handleAIChatSubmit(e) {
+            if (e) e.preventDefault();
+            const inputEl = document.getElementById('aiUserInput');
+            const query = inputEl.value.trim();
+            if (!query) return;
+
+            inputEl.value = '';
+            appendChatMessage('user', formatMarkdownSimple(query));
+
+            const loadingBubble = appendChatMessage('ai', `<span class="text-teal font-medium flex items-center gap-2"><i class="fas fa-circle-notch fa-spin"></i> Google Gemini sedang menganalisis...</span>`);
+
+            const reply = await callGeminiAPI(query);
+            loadingBubble.remove();
+            appendChatMessage('ai', formatMarkdownSimple(reply));
+        }
+
+        function sendQuickPrompt(promptText) {
+            document.getElementById('aiUserInput').value = promptText;
+            handleAIChatSubmit();
+        }
+
+        function askAIAboutOutput() {
+            const term = document.getElementById('terminalOutput');
+            const rawText = (term.innerText || term.textContent).trim();
+            if (!rawText) {
+                alert("Jalankan simulasi perintah terlebih dahulu agar output-nya dapat dianalisis oleh Google AI.");
+                return;
+            }
+            switchTab('ai');
+            const prompt = `Tolong jelaskan arti dari output terminal berikut dengan bahasa yang mudah dipahami beserta kesimpulan kesehatannya:\n\n${rawText}`;
+            sendQuickPrompt(prompt);
+        }
+
+        function analyzeCurrentTerminalWithAI() {
+            const term = document.getElementById('terminalOutput');
+            const rawText = (term.innerText || term.textContent).trim();
+            if (!rawText) {
+                sendQuickPrompt("Berikan contoh cara membaca output ping, tracert, dan nmap untuk mendeteksi masalah jaringan kantor.");
+            } else {
+                sendQuickPrompt(`Tolong bedah hasil output terminal saya berikut ini dengan bahasa yang mudah dimengerti:\n\n${rawText}`);
+            }
+        }
+
+        // --- Modal Control (Form) ---
+        const modal = document.getElementById('formModal');
+        const modalContent = document.getElementById('formModalContent');
+        
+        function openModal() {
+            modal.classList.remove('hidden');
+            setTimeout(() => {
+                modal.classList.remove('opacity-0');
+                modalContent.classList.remove('translate-y-full');
+            }, 10);
+        }
+
+        function closeModal() {
+            modal.classList.add('opacity-0');
+            modalContent.classList.add('translate-y-full');
+            setTimeout(() => {
+                modal.classList.add('hidden');
+                document.getElementById('deviceForm').reset();
+                document.getElementById('editIndex').value = '-1';
+                document.getElementById('modalTitle').innerText = 'Tambah Perangkat';
+            }, 300);
+        }
+
+        // Event Listeners
+        document.getElementById('btnFAB').addEventListener('click', openModal);
+        document.getElementById('btnCloseModal').addEventListener('click', closeModal);
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) closeModal();
+        });
+        menuModal.addEventListener('click', (e) => {
+            if (e.target === menuModal) closeMenu();
+        });
+        
+        document.getElementById('searchInput').addEventListener('input', (e) => {
+            renderList(e.target.value);
+        });
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', initApp);
+
+    </script>
+</body>
+</html>
